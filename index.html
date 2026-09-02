@@ -156,6 +156,16 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
   background:var(--yuzey);border:1px solid var(--cizgi);border-radius:10px;font-size:.92rem;
 }
 .ist-satir b{font-variant-numeric:tabular-nums}
+.ist-baslik{font-size:.82rem;color:var(--sonuk);margin:4px 0 -4px}
+.yuk-grafik{
+  display:flex;flex-direction:column;gap:7px;
+  background:var(--yuzey);border:1px solid var(--cizgi);border-radius:10px;padding:14px;
+}
+.yuk-satir{display:flex;align-items:center;gap:10px;font-size:.85rem}
+.yuk-gun{width:3.4em;flex:0 0 auto;color:var(--sonuk)}
+.yuk-cubuk-dis{flex:1;background:var(--yuzey2);border-radius:6px;overflow:hidden;height:18px}
+.yuk-cubuk{display:block;height:100%;background:var(--der);border-radius:6px;min-width:2px}
+.yuk-sayi{width:2.2em;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:calc(26px + env(safe-area-inset-bottom));
   background:var(--metin);color:var(--bg);padding:11px 18px;border-radius:22px;
@@ -739,6 +749,53 @@ document.getElementById('fKaydet').onclick = () => {
 };
 
 /* ---------- istatistik ---------- */
+
+// gun basi: bugunun yerel gece yarisindan itibaren 'ofset' gun sonrasi
+function gunBasi(ofset) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + ofset);
+  return d.getTime();
+}
+
+// onumuzdeki 7 gun icin vakti gelecek kart sayisi (bugun dahil, gecikmisler bugune sayilir)
+function yukVerisi() {
+  const sayilar = new Array(7).fill(0);
+  const sinirlar = [];
+  for (let i = 0; i <= 7; i++) sinirlar.push(gunBasi(i));
+
+  for (const id in ILERLEME) {
+    const sonraki = ILERLEME[id].sonraki;
+    if (sonraki >= sinirlar[7]) continue;
+    if (sonraki < sinirlar[1]) { sayilar[0]++; continue; }
+    for (let i = 1; i < 7; i++) {
+      if (sonraki >= sinirlar[i] && sonraki < sinirlar[i + 1]) { sayilar[i]++; break; }
+    }
+  }
+  return sayilar;
+}
+
+function gunEtiketi(ofset) {
+  if (ofset === 0) return 'Bugün';
+  if (ofset === 1) return 'Yarın';
+  return new Date(gunBasi(ofset)).toLocaleDateString('tr-TR', { weekday: 'short' });
+}
+
+function yukGrafigi() {
+  const sayilar = yukVerisi();
+  const en = Math.max(1, ...sayilar);
+  let h = '<div class="yuk-grafik">';
+  for (let i = 0; i < 7; i++) {
+    const oran = Math.round((sayilar[i] / en) * 100);
+    h += `<div class="yuk-satir">
+            <span class="yuk-gun">${gunEtiketi(i)}</span>
+            <span class="yuk-cubuk-dis"><span class="yuk-cubuk" style="width:${oran}%"></span></span>
+            <span class="yuk-sayi">${sayilar[i]}</span>
+          </div>`;
+  }
+  return h + '</div>';
+}
+
 function istCiz() {
   const hepsi = kartlar();
   let yeni = 0, ogr = 0, tek = 0, olgun = 0;
@@ -759,7 +816,11 @@ function istCiz() {
     satir('Olgun kart (21+ gün)', olgun) +
     satir('Bugün çalışılan yeni kart', AYAR.yeniSayac + ' / ' + AYAR.yeniLimit) +
     `<p class="yardim">Olgun kart, aralığı 21 günü aşmış kartlar. Bu sayının düzenli
-     artması öğrenmenin kalıcı hale geldiğini gösterir.</p>`;
+     artması öğrenmenin kalıcı hale geldiğini gösterir.</p>` +
+    `<div class="ist-baslik">Önümüzdeki 7 gün — tekrar yükü</div>` +
+    yukGrafigi() +
+    `<p class="yardim">Her gün o gün vakti gelecek kart sayısını gösterir. Gecikmiş
+     kartlar bugüne sayılır. Yeni kelime sınırını yükseltmeden önce bu yüke bak.</p>`;
 }
 
 /* ---------- yedek ---------- */
