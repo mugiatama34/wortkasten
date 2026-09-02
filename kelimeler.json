@@ -1,0 +1,257 @@
+{
+  "surum": 1,
+  "guncelleme": "2026-09-02",
+  "kelimeler": [
+    {
+      "id": "w001",
+      "tur": "isim",
+      "de": "Ansatz",
+      "artikel": "der",
+      "cogul": "Ansätze",
+      "tr": "yaklaşım, girişim",
+      "cumle": "Der neue {{Ansatz}} funktioniert deutlich besser.",
+      "cumle_tr": "Yeni yaklaşım belirgin şekilde daha iyi çalışıyor.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w002",
+      "tur": "isim",
+      "de": "Zuverlässigkeit",
+      "artikel": "die",
+      "cogul": "—",
+      "tr": "güvenilirlik",
+      "cumle": "Die {{Zuverlässigkeit}} des Bauteils wurde geprüft.",
+      "cumle_tr": "Parçanın güvenilirliği test edildi.",
+      "etiket": ["is", "teknik"]
+    },
+    {
+      "id": "w003",
+      "tur": "isim",
+      "de": "Bauteil",
+      "artikel": "das",
+      "cogul": "Bauteile",
+      "tr": "yapı parçası, komponent",
+      "cumle": "Jedes {{Bauteil}} hat eine eigene Nummer.",
+      "cumle_tr": "Her komponentin kendi numarası var.",
+      "etiket": ["is", "teknik"]
+    },
+    {
+      "id": "w004",
+      "tur": "fiil",
+      "de": "prüfen",
+      "formlar": "prüft, prüfte, hat geprüft",
+      "tr": "kontrol etmek, test etmek",
+      "cumle": "Wir müssen die Werte noch einmal {{prüfen}}.",
+      "cumle_tr": "Değerleri bir kez daha kontrol etmeliyiz.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w005",
+      "tur": "fiil",
+      "de": "vorschlagen",
+      "formlar": "schlägt vor, schlug vor, hat vorgeschlagen",
+      "tr": "önermek, teklif etmek",
+      "cumle": "Darf ich einen Termin {{vorschlagen}}?",
+      "cumle_tr": "Bir randevu önerebilir miyim?",
+      "etiket": ["is", "ayrilabilir"]
+    },
+    {
+      "id": "w006",
+      "tur": "isim",
+      "de": "Ausfall",
+      "artikel": "der",
+      "cogul": "Ausfälle",
+      "tr": "arıza, devre dışı kalma",
+      "cumle": "Der {{Ausfall}} trat nach 2000 Stunden auf.",
+      "cumle_tr": "Arıza 2000 saat sonra ortaya çıktı.",
+      "etiket": ["is", "teknik"]
+    },
+    {
+      "id": "w007",
+      "tur": "isim",
+      "de": "Anforderung",
+      "artikel": "die",
+      "cogul": "Anforderungen",
+      "tr": "gereklilik, şart",
+      "cumle": "Diese {{Anforderung}} steht im Lastenheft.",
+      "cumle_tr": "Bu gereklilik şartnamede yazıyor.",
+      "etiket": ["is", "teknik"]
+    },
+    {
+      "id": "w008",
+      "tur": "sifat",
+      "de": "zuverlässig",
+      "tr": "güvenilir",
+      "cumle": "Das Bauteil ist sehr {{zuverlässig}}.",
+      "cumle_tr": "Bu parça çok güvenilir.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w009",
+      "tur": "isim",
+      "de": "Erfahrung",
+      "artikel": "die",
+      "cogul": "Erfahrungen",
+      "tr": "tecrübe, deneyim",
+      "cumle": "Er hat viel {{Erfahrung}} in diesem Bereich.",
+      "cumle_tr": "Bu alanda çok tecrübesi var.",
+      "etiket": ["gunluk"]
+    },
+    {
+      "id": "w010",
+      "tur": "isim",
+      "de": "Termin",
+      "artikel": "der",
+      "cogul": "Termine",
+      "tr": "randevu, tarih",
+      "cumle": "Der {{Termin}} wurde auf Freitag verschoben.",
+      "cumle_tr": "Randevu cumaya ertelendi.",
+      "etiket": ["gunluk", "is"]
+    },
+    {
+      "id": "w011",
+      "tur": "fiil",
+      "de": "verschieben",
+      "formlar": "verschiebt, verschob, hat verschoben",
+      "tr": "ertelemek, kaydırmak",
+      "cumle": "Können wir das Treffen {{verschieben}}?",
+      "cumle_tr": "Toplantıyı erteleyebilir miyiz?",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w012",
+      "tur": "isim",
+      "de": "Ergebnis",
+      "artikel": "das",
+      "cogul": "Ergebnisse",
+      "tr": "sonuç",
+      "cumle": "Das {{Ergebnis}} war überraschend gut.",
+      "cumle_tr": "Sonuç şaşırtıcı derecede iyiydi.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w013",
+      "tur": "sifat",
+      "de": "aufwendig",
+      "tr": "zahmetli, masraflı",
+      "cumle": "Die Messung ist ziemlich {{aufwendig}}.",
+      "cumle_tr": "Ölçüm oldukça zahmetli.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w014",
+      "tur": "isim",
+      "de": "Vorschlag",
+      "artikel": "der",
+      "cogul": "Vorschläge",
+      "tr": "öneri, teklif",
+      "cumle": "Dein {{Vorschlag}} gefällt mir.",
+      "cumle_tr": "Önerin hoşuma gitti.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w015",
+      "tur": "isim",
+      "de": "Umgebung",
+      "artikel": "die",
+      "cogul": "Umgebungen",
+      "tr": "çevre, ortam",
+      "cumle": "Der Test läuft in einer heißen {{Umgebung}}.",
+      "cumle_tr": "Test sıcak bir ortamda yürüyor.",
+      "etiket": ["teknik"]
+    },
+    {
+      "id": "w016",
+      "tur": "fiil",
+      "de": "auftreten",
+      "formlar": "tritt auf, trat auf, ist aufgetreten",
+      "tr": "ortaya çıkmak, meydana gelmek",
+      "cumle": "Der Fehler ist zweimal {{aufgetreten}}.",
+      "cumle_tr": "Hata iki kez ortaya çıktı.",
+      "etiket": ["teknik", "ayrilabilir"]
+    },
+    {
+      "id": "w017",
+      "tur": "isim",
+      "de": "Nachweis",
+      "artikel": "der",
+      "cogul": "Nachweise",
+      "tr": "kanıt, ispat, belge",
+      "cumle": "Wir brauchen einen {{Nachweis}} für die Lebensdauer.",
+      "cumle_tr": "Ömür için bir kanıta ihtiyacımız var.",
+      "etiket": ["teknik"]
+    },
+    {
+      "id": "w018",
+      "tur": "isim",
+      "de": "Abweichung",
+      "artikel": "die",
+      "cogul": "Abweichungen",
+      "tr": "sapma, uygunsuzluk",
+      "cumle": "Eine kleine {{Abweichung}} ist noch zulässig.",
+      "cumle_tr": "Küçük bir sapma hâlâ kabul edilebilir.",
+      "etiket": ["teknik"]
+    },
+    {
+      "id": "w019",
+      "tur": "sifat",
+      "de": "zulässig",
+      "tr": "izin verilen, kabul edilebilir",
+      "cumle": "Diese Toleranz ist nicht mehr {{zulässig}}.",
+      "cumle_tr": "Bu tolerans artık kabul edilebilir değil.",
+      "etiket": ["teknik"]
+    },
+    {
+      "id": "w020",
+      "tur": "isim",
+      "de": "Gerät",
+      "artikel": "das",
+      "cogul": "Geräte",
+      "tr": "cihaz, alet",
+      "cumle": "Das {{Gerät}} muss kalibriert werden.",
+      "cumle_tr": "Cihazın kalibre edilmesi gerekiyor.",
+      "etiket": ["teknik", "gunluk"]
+    },
+    {
+      "id": "w021",
+      "tur": "fiil",
+      "de": "sich kümmern",
+      "formlar": "kümmert sich, kümmerte sich, hat sich gekümmert",
+      "tr": "ilgilenmek, bakmak",
+      "cumle": "Ich {{kümmere}} mich um die Kinder.",
+      "cumle_tr": "Çocuklarla ben ilgileniyorum.",
+      "etiket": ["gunluk"]
+    },
+    {
+      "id": "w022",
+      "tur": "isim",
+      "de": "Wartung",
+      "artikel": "die",
+      "cogul": "Wartungen",
+      "tr": "bakım",
+      "cumle": "Die {{Wartung}} findet jeden Monat statt.",
+      "cumle_tr": "Bakım her ay yapılıyor.",
+      "etiket": ["teknik"]
+    },
+    {
+      "id": "w023",
+      "tur": "sifat",
+      "de": "vorläufig",
+      "tr": "geçici, ön (nihai olmayan)",
+      "cumle": "Das ist nur ein {{vorläufiges}} Ergebnis.",
+      "cumle_tr": "Bu sadece geçici bir sonuç.",
+      "etiket": ["is"]
+    },
+    {
+      "id": "w024",
+      "tur": "isim",
+      "de": "Umsetzung",
+      "artikel": "die",
+      "cogul": "Umsetzungen",
+      "tr": "hayata geçirme, uygulama",
+      "cumle": "Die {{Umsetzung}} dauert drei Monate.",
+      "cumle_tr": "Uygulama üç ay sürüyor.",
+      "etiket": ["is"]
+    }
+  ]
+}
