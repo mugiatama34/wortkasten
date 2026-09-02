@@ -166,6 +166,10 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
 .yuk-cubuk-dis{flex:1;background:var(--yuzey2);border-radius:6px;overflow:hidden;height:18px}
 .yuk-cubuk{display:block;height:100%;background:var(--der);border-radius:6px;min-width:2px}
 .yuk-sayi{width:2.2em;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.geri-al-btn{
+  display:block;width:100%;padding:8px;margin-bottom:8px;
+  font-size:.82rem;color:var(--sonuk);text-align:center;
+}
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:calc(26px + env(safe-area-inset-bottom));
   background:var(--metin);color:var(--bg);padding:11px 18px;border-radius:22px;
@@ -333,6 +337,7 @@ let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0 };
 let kuyruk = [];
 let aktif = null;
 let acik = false;     // cevap gorunuyor mu
+let sonGeriAl = null;  // son puanlamayi geri almak icin — sadece bir adim
 
 /* ==========================================================
    Depolama
@@ -612,10 +617,18 @@ function ornekKutu(k) {
   return `<div class="ornek">${dolu}${k.cumle_tr ? `<span class="cevirisi">${kac(k.cumle_tr)}</span>` : ''}</div>`;
 }
 
+function geriAlBtn() {
+  return sonGeriAl ? `<button class="geri-al-btn" id="geriAlBtn">↺ Son cevabı geri al</button>` : '';
+}
+function geriAlBagla() {
+  if (sonGeriAl) document.getElementById('geriAlBtn').onclick = geriAl;
+}
+
 function altCiz() {
   if (!acik) {
-    alt.innerHTML = `<button class="goster-btn" id="gosterBtn">Cevabı göster</button>`;
+    alt.innerHTML = geriAlBtn() + `<button class="goster-btn" id="gosterBtn">Cevabı göster</button>`;
     document.getElementById('gosterBtn').onclick = () => { acik = true; kartCiz(); };
+    geriAlBagla();
     return;
   }
   const d = ILERLEME[aktif.id] || yeniDurum();
@@ -628,25 +641,52 @@ function altCiz() {
             <b>${etiket[p]}</b><span>${sureMetni(s.sonraki - simdi)}</span>
           </button>`;
   }
-  alt.innerHTML = h + '</div>';
+  alt.innerHTML = geriAlBtn() + h + '</div>';
   alt.querySelectorAll('[data-puan]').forEach(b => {
     b.onclick = () => puanla(parseInt(b.dataset.puan, 10));
   });
+  geriAlBagla();
 }
 
 function puanla(p) {
-  const oncekiDurum = ILERLEME[aktif.id];
+  const kart = aktif;
+  const oncekiDurum = ILERLEME[kart.id];
+  const yeniMi = !oncekiDurum;
   const d = oncekiDurum || yeniDurum();
-  if (!oncekiDurum) { AYAR.yeniSayac += 1; yaz(K_AYAR, AYAR); }
+  if (yeniMi) { AYAR.yeniSayac += 1; yaz(K_AYAR, AYAR); }
 
-  ILERLEME[aktif.id] = planla(d, p);
+  ILERLEME[kart.id] = planla(d, p);
   yaz(K_ILERLEME, ILERLEME);
 
   kuyruk.shift();
   // birkac dakika icinde geri gelecekse kuyrugun sonuna al
-  const y = ILERLEME[aktif.id];
-  if (y.sonraki - Date.now() < 20 * DK) kuyruk.push(aktif);
+  const y = ILERLEME[kart.id];
+  let eklendiKuyruga = false;
+  if (y.sonraki - Date.now() < 20 * DK) { kuyruk.push(kart); eklendiKuyruga = true; }
 
+  sonGeriAl = { kart, oncekiDurum, yeniMi, eklendiKuyruga };
+
+  sayaclariGuncelle();
+  ciz();
+}
+
+function geriAl() {
+  if (!sonGeriAl) return;
+  const { kart, oncekiDurum, yeniMi, eklendiKuyruga } = sonGeriAl;
+
+  if (oncekiDurum) ILERLEME[kart.id] = oncekiDurum;
+  else delete ILERLEME[kart.id];
+  yaz(K_ILERLEME, ILERLEME);
+
+  if (yeniMi) { AYAR.yeniSayac = Math.max(0, AYAR.yeniSayac - 1); yaz(K_AYAR, AYAR); }
+
+  if (eklendiKuyruga) {
+    const idx = kuyruk.lastIndexOf(kart);
+    if (idx !== -1) kuyruk.splice(idx, 1);
+  }
+  kuyruk.unshift(kart);
+
+  sonGeriAl = null;
   sayaclariGuncelle();
   ciz();
 }
@@ -668,7 +708,8 @@ function bosEkran() {
       <button id="bosEkle">Kelime ekle</button></div>`;
     document.getElementById('bosEkle').onclick = () => panelAc('pEkle');
   }
-  alt.innerHTML = '';
+  alt.innerHTML = geriAlBtn();
+  geriAlBagla();
 }
 
 function enYakinTarih() {
@@ -873,7 +914,7 @@ document.getElementById('aKaydet').onclick = () => {
 
 document.getElementById('aSifirla').onclick = () => {
   if (!confirm('Tüm tekrar geçmişin silinecek. Eklediğin kelimeler kalacak. Devam edilsin mi?')) return;
-  ILERLEME = {}; AYAR.yeniSayac = 0;
+  ILERLEME = {}; AYAR.yeniSayac = 0; sonGeriAl = null;
   yaz(K_ILERLEME, ILERLEME); yaz(K_AYAR, AYAR);
   bildir('İlerleme sıfırlandı');
   kuyrukKur(); panelKapat(); ciz();
