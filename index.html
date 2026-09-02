@@ -325,9 +325,10 @@ const MEZUN = 1;                  // "Iyi" ile mezun olunca ilk aralik (gun)
 const KOLAY = 4;                  // "Kolay" ile dogrudan mezuniyet (gun)
 const EF_BAS = 2.5, EF_MIN = 1.3, EF_MAX = 3.0;
 
-const K_ILERLEME = 'wortkasten:ilerleme';
-const K_OZEL     = 'wortkasten:ozel';
-const K_AYAR     = 'wortkasten:ayar';
+const K_ILERLEME  = 'wortkasten:ilerleme';
+const K_OZEL      = 'wortkasten:ozel';
+const K_AYAR      = 'wortkasten:ayar';
+const K_YENISECIM = 'wortkasten:yeniSecim';  // gunun yeni kelime secimi
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -437,8 +438,9 @@ function sureMetni(ms) {
    ========================================================== */
 function kuyrukKur() {
   const simdi = Date.now();
+  const gun = bugun();
 
-  if (AYAR.gun !== bugun()) { AYAR.gun = bugun(); AYAR.yeniSayac = 0; yaz(K_AYAR, AYAR); }
+  if (AYAR.gun !== gun) { AYAR.gun = gun; AYAR.yeniSayac = 0; yaz(K_AYAR, AYAR); }
 
   const hepsi = kartlar();
   const ogrenme = [], tekrar = [], yeni = [];
@@ -453,8 +455,16 @@ function kuyrukKur() {
   ogrenme.sort((a, b) => ILERLEME[a.id].sonraki - ILERLEME[b.id].sonraki);
   karistir(tekrar);
 
-  const kalanYeni = Math.max(0, AYAR.yeniLimit - AYAR.yeniSayac);
-  const secilenYeni = yeni.slice(0, kalanYeni);
+  // gunun yeni kelimeleri: hic gorulmemis kelimeler arasindan rastgele
+  // secilir; secim gun boyunca sabit kalir, sayfa yenilense de degismez
+  let secim = oku(K_YENISECIM, null);
+  if (!secim || secim.gun !== gun) {
+    const kelimeIdleri = karistir([...new Set(yeni.map(kart => kart.k.id))]);
+    secim = { gun, idler: kelimeIdleri.slice(0, AYAR.yeniLimit) };
+    yaz(K_YENISECIM, secim);
+  }
+  const secilenKelimeler = new Set(secim.idler);
+  const secilenYeni = yeni.filter(kart => secilenKelimeler.has(kart.k.id));
 
   // yeni kartlari tekrarlarin arasina dagit ki tek blok halinde gelmesin
   kuyruk = ogrenme.concat(harmanla(tekrar, secilenYeni));
@@ -496,15 +506,49 @@ function karistir(a) {
 
 function harmanla(tekrarlar, yeniler) {
   if (!yeniler.length) return tekrarlar;
-  if (!tekrarlar.length) return yeniler;
+
+  // kardes kartlari (ayni kelimenin de-tr / tr-de / cumle kartlari) art
+  // arda gelmesin diye kelimeye gore gruplayip sirayla (round-robin) diz
+  const gruplar = new Map();
+  for (const kart of yeniler) {
+    if (!gruplar.has(kart.k.id)) gruplar.set(kart.k.id, []);
+    gruplar.get(kart.k.id).push(kart);
+  }
+  const grupListesi = karistir([...gruplar.values()]);
+  const bekleyen = [];
+  let kaldi = true;
+  while (kaldi) {
+    kaldi = false;
+    for (const grup of grupListesi) {
+      if (grup.length) { bekleyen.push(grup.shift()); kaldi = true; }
+    }
+  }
+
+  if (!tekrarlar.length) return bekleyen;
+
+  const MIN_ARA = 5;
+  const sonKonum = new Map();  // kelime id -> kuyruktaki son konumu
   const sonuc = [];
-  const her = Math.max(1, Math.round(tekrarlar.length / yeniler.length));
-  let yi = 0;
+  const her = Math.max(1, Math.round(tekrarlar.length / bekleyen.length));
+
   for (let i = 0; i < tekrarlar.length; i++) {
     sonuc.push(tekrarlar[i]);
-    if ((i + 1) % her === 0 && yi < yeniler.length) sonuc.push(yeniler[yi++]);
+    if ((i + 1) % her !== 0 || !bekleyen.length) continue;
+
+    // bekleyenler arasindan min araligi saglayan ilkini sec; hicbiri
+    // saglamiyorsa en genis araliga sahip olani sec — karti atlama
+    let secIndex = 0, enGenisMesafe = -1;
+    for (let j = 0; j < bekleyen.length; j++) {
+      const son = sonKonum.get(bekleyen[j].k.id);
+      const mesafe = son === undefined ? Infinity : sonuc.length - son;
+      if (mesafe >= MIN_ARA) { secIndex = j; break; }
+      if (mesafe > enGenisMesafe) { enGenisMesafe = mesafe; secIndex = j; }
+    }
+    const kart = bekleyen.splice(secIndex, 1)[0];
+    sonuc.push(kart);
+    sonKonum.set(kart.k.id, sonuc.length - 1);
   }
-  while (yi < yeniler.length) sonuc.push(yeniler[yi++]);
+  while (bekleyen.length) sonuc.push(bekleyen.shift());
   return sonuc;
 }
 
