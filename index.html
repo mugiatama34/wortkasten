@@ -170,6 +170,14 @@ button:disabled{opacity:.55;cursor:default}
 .yuk-cubuk-dis{flex:1;background:var(--yuzey2);border-radius:6px;overflow:hidden;height:18px}
 .yuk-cubuk{display:block;height:100%;background:var(--der);border-radius:6px;min-width:2px}
 .yuk-sayi{width:2.2em;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.test-satir{
+  display:flex;align-items:flex-start;gap:9px;padding:11px 12px;
+  background:var(--yuzey);border:1px solid var(--cizgi);border-radius:10px;
+  font-size:.88rem;line-height:1.4;
+}
+.test-ikon{flex:0 0 auto;font-weight:700}
+.test-ok .test-ikon{color:var(--iyi)}
+.test-hata .test-ikon{color:var(--die)}
 .geri-al-btn{
   display:block;width:100%;padding:8px;margin-bottom:8px;
   font-size:.82rem;color:var(--sonuk);text-align:center;
@@ -343,6 +351,9 @@ button:disabled{opacity:.55;cursor:default}
     <button class="birincil" id="aKaydet">Kaydet</button>
     <div class="ayirac"></div>
     <button class="ikincil" id="aSifirla" style="color:var(--die)">Tüm ilerlemeyi sıfırla</button>
+    <div class="ayirac"></div>
+    <button class="ikincil" id="aTestEt">Bağlantıyı test et</button>
+    <div id="aTestSonuc" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
 
@@ -903,6 +914,39 @@ function aiDurumGuncelle() {
   document.getElementById('fCumleOner').classList.toggle('gizli', !API_ANAHTARI);
 }
 
+// Anthropic Messages API'sine istek atar; basarisizlikta API'nin kendi
+// error.message metnini tasiyan bir Error firlatir, uydurma mesaj uretmez.
+async function anthropicIstek(govde) {
+  let yanit;
+  try {
+    yanit = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': API_ANAHTARI,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(govde)
+    });
+  } catch (h) {
+    throw new Error('Ağ hatası — bağlantını kontrol et');
+  }
+
+  let veri = null;
+  try { veri = await yanit.json(); }
+  catch (h) { /* govde json degil, veri null kalsin */ }
+
+  // hata durumu iki sekilde gelir: HTTP durum kodu 2xx disinda, ya da
+  // (nadiren) govde {"type":"error",...} tasiyor olabilir — ikisini de kontrol et
+  if (!yanit.ok || (veri && veri.type === 'error')) {
+    const mesaj = veri && veri.error && veri.error.message;
+    throw new Error(mesaj || ('İstek başarısız (HTTP ' + yanit.status + ')'));
+  }
+  if (!veri) throw new Error('Beklenmeyen yanıt formatı (HTTP ' + yanit.status + ')');
+  return veri;
+}
+
 async function cumleUret(de, tur, tr) {
   const turMetin = { isim: 'isim', fiil: 'fiil', sifat: 'sıfat', diger: 'diğer' }[tur] || tur;
   const artikel = tur === 'isim' ? document.getElementById('fArtikel').value : '';
@@ -923,38 +967,11 @@ Yanıtın SADECE şu JSON formatında olsun, başka hiçbir metin, açıklama ya
 markdown kod bloğu ekleme:
 {"cumle": "...", "cumle_tr": "..."}`;
 
-  let yanit;
-  try {
-    yanit = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_ANAHTARI,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
-        max_tokens: 300,
-        messages: [{ role: 'user', content: istemMetni }]
-      })
-    });
-  } catch (h) {
-    throw new Error('Ağ hatası — bağlantını kontrol et');
-  }
-
-  if (!yanit.ok) {
-    let mesaj = '';
-    try { const v = await yanit.json(); mesaj = (v.error && v.error.message) || ''; }
-    catch (h) { /* govde json degil, mesaj bos kalsin */ }
-    if (yanit.status === 401) throw new Error('Geçersiz API anahtarı');
-    if (/credit balance/i.test(mesaj)) throw new Error('Bakiye yetersiz');
-    throw new Error(mesaj || ('İstek başarısız (' + yanit.status + ')'));
-  }
-
-  let veri;
-  try { veri = await yanit.json(); }
-  catch (h) { throw new Error('Beklenmeyen yanıt formatı'); }
+  const veri = await anthropicIstek({
+    model: AI_MODEL,
+    max_tokens: 300,
+    messages: [{ role: 'user', content: istemMetni }]
+  });
 
   const metin = veri.content && veri.content[0] && veri.content[0].text;
   if (!metin) throw new Error('Beklenmeyen yanıt formatı');
@@ -1007,11 +1024,25 @@ function base64ToUtf8(b64) {
 
 const GH_ICERIK_URL = `https://api.github.com/repos/${GITHUB_SAHIP}/${GITHUB_REPO}/contents/kelimeler.json`;
 
+// GitHub'in hata govdesindeki "message" alanini okur; yoksa bos dizi doner
+async function ghHataMesaji(yanit) {
+  try { const v = await yanit.json(); return (v && v.message) || ''; }
+  catch (h) { return ''; }
+}
+
 async function ghKelimelerOku() {
-  const yanit = await fetch(GH_ICERIK_URL, {
-    headers: { 'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json' }
-  });
-  if (!yanit.ok) throw new Error('okuma-basarisiz');
+  let yanit;
+  try {
+    yanit = await fetch(GH_ICERIK_URL, {
+      headers: { 'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json' }
+    });
+  } catch (h) {
+    throw new Error('Ağ hatası — bağlantını kontrol et');
+  }
+  if (!yanit.ok) {
+    const mesaj = await ghHataMesaji(yanit);
+    throw new Error(mesaj || ('İstek başarısız (HTTP ' + yanit.status + ')'));
+  }
   const veri = await yanit.json();
   return { json: JSON.parse(base64ToUtf8(veri.content)), sha: veri.sha };
 }
@@ -1023,25 +1054,33 @@ async function ghKelimeleriYaz(yeniKelimeler, tekrarMi) {
     ? 'Kelime ekle: ' + yeniKelimeler[0].de
     : yeniKelimeler.length + ' kelime ekle';
 
-  const yanit = await fetch(GH_ICERIK_URL, {
-    method: 'PUT',
-    headers: {
-      'Authorization': 'Bearer ' + GH_TOKEN,
-      'Accept': 'application/vnd.github+json',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      message: mesaj,
-      content: utf8ToBase64(JSON.stringify(json, null, 2) + '\n'),
-      sha
-    })
-  });
+  let yanit;
+  try {
+    yanit = await fetch(GH_ICERIK_URL, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + GH_TOKEN,
+        'Accept': 'application/vnd.github+json',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: mesaj,
+        content: utf8ToBase64(JSON.stringify(json, null, 2) + '\n'),
+        sha
+      })
+    });
+  } catch (h) {
+    throw new Error('Ağ hatası — bağlantını kontrol et');
+  }
 
   if (yanit.status === 409) {
-    if (tekrarMi) throw new Error('cakisma');
+    if (tekrarMi) throw new Error('Dosya sürekli değişiyor, çakışma çözülemedi — tekrar dene');
     return ghKelimeleriYaz(yeniKelimeler, true);
   }
-  if (!yanit.ok) throw new Error('yazma-basarisiz');
+  if (!yanit.ok) {
+    const hataMesaji = await ghHataMesaji(yanit);
+    throw new Error(hataMesaji || ('İstek başarısız (HTTP ' + yanit.status + ')'));
+  }
 }
 
 async function senkronEt() {
@@ -1057,7 +1096,7 @@ async function senkronEt() {
       ? gonderilecek[0].de + ' repoya senkronize edildi'
       : gonderilecek.length + ' kelime repoya senkronize edildi');
   } catch (h) {
-    bildir('Kelime bu cihazda güvende, bağlantı kurulunca tekrar denenecek');
+    bildir('Repoya yazılamadı: ' + (h.message || 'bilinmeyen hata'));
   } finally {
     senkronDevamEdiyor = false;
   }
@@ -1235,6 +1274,60 @@ document.getElementById('aSifirla').onclick = () => {
   yaz(K_ILERLEME, ILERLEME); yaz(K_AYAR, AYAR);
   bildir('İlerleme sıfırlandı');
   kuyrukKur(); panelKapat(); ciz();
+};
+
+/* ---------- baglanti testi ---------- */
+function testSatiri(basarili, baslik, mesaj) {
+  return `<div class="test-satir ${basarili ? 'test-ok' : 'test-hata'}">
+    <span class="test-ikon">${basarili ? '✓' : '✕'}</span>
+    <span><b>${kac(baslik)}</b><br>${kac(mesaj)}</span>
+  </div>`;
+}
+
+document.getElementById('aTestEt').onclick = async () => {
+  // ekrandaki alanlar henuz kaydedilmemis olabilir, testi onlarla calistir
+  const apiAnahtari = document.getElementById('aApiAnahtar').value.trim();
+  const ghToken = document.getElementById('aGhToken').value.trim();
+
+  const btn = document.getElementById('aTestEt');
+  const sonucEl = document.getElementById('aTestSonuc');
+  btn.disabled = true; btn.textContent = 'Test ediliyor...';
+  sonucEl.innerHTML = '';
+
+  const satirlar = [];
+
+  if (!apiAnahtari) {
+    satirlar.push(testSatiri(false, 'Anthropic API', 'Anahtar girilmemiş'));
+  } else {
+    const oncekiAnahtar = API_ANAHTARI;
+    API_ANAHTARI = apiAnahtari;
+    try {
+      await anthropicIstek({ model: AI_MODEL, max_tokens: 8, messages: [{ role: 'user', content: 'merhaba' }] });
+      satirlar.push(testSatiri(true, 'Anthropic API', 'Bağlantı başarılı'));
+    } catch (h) {
+      satirlar.push(testSatiri(false, 'Anthropic API', h.message || 'bilinmeyen hata'));
+    } finally {
+      API_ANAHTARI = oncekiAnahtar;
+    }
+  }
+
+  if (!ghToken) {
+    satirlar.push(testSatiri(false, 'GitHub', 'Token girilmemiş'));
+  } else {
+    const oncekiToken = GH_TOKEN;
+    GH_TOKEN = ghToken;
+    try {
+      await ghKelimelerOku();
+      satirlar.push(testSatiri(true, 'GitHub', 'kelimeler.json okunabiliyor'));
+    } catch (h) {
+      satirlar.push(testSatiri(false, 'GitHub', h.message || 'bilinmeyen hata'));
+    } finally {
+      GH_TOKEN = oncekiToken;
+    }
+  }
+
+  sonucEl.innerHTML = satirlar.join('');
+  btn.disabled = false; btn.textContent = 'Bağlantıyı test et';
 };
 
 /* ---------- klavye ---------- */
