@@ -1164,7 +1164,10 @@ async function anthropicIstek(govde) {
 
 // content dizisini sirayla degil turune gore okur — extended thinking acik
 // modellerde dizinin ilk elemani {"type":"thinking",...} olabiliyor, asil
-// metin ilerideki bir "text" blogunda geliyor.
+// metin ilerideki bir "text" blogunda geliyor. Sadece cumle onerisi ve
+// fotograftan kelime cikarma gibi gercek islerde cagrilir — kesik yanitin
+// alanlarin eksik/bozuk olmasina yol acabilecegi tek yer burasi. Baglanti
+// testi bunu kullanmaz, dusuk max_tokens ile kesilme orada beklenen durum.
 function yanitMetni(veri) {
   const bloklar = (veri && Array.isArray(veri.content)) ? veri.content : [];
   const metin = bloklar.filter(b => b && b.type === 'text').map(b => b.text).join('\n');
@@ -1917,8 +1920,11 @@ document.getElementById('aTestEt').onclick = async () => {
     const oncekiAnahtar = API_ANAHTARI;
     API_ANAHTARI = apiAnahtari;
     try {
-      const testVerisi = await anthropicIstek({ model: AI_MODEL, max_tokens: 8, messages: [{ role: 'user', content: 'merhaba' }] });
-      yanitMetni(testVerisi);
+      // basari olcutu sadece HTTP 200 ve govde type "error" degil —
+      // anthropicIstek bunu zaten kontrol ediyor. yanitMetni burada
+      // cagrilmiyor: dusuk max_tokens yuzunden stop_reason "max_tokens"
+      // gelmesi beklenen bir durum, bu bir baglanti hatasi degil.
+      await anthropicIstek({ model: AI_MODEL, max_tokens: 16, messages: [{ role: 'user', content: 'merhaba' }] });
       satirlar.push(testSatiri(true, 'Anthropic API', 'Bağlantı başarılı'));
     } catch (h) {
       satirlar.push(testSatiri(false, 'Anthropic API', h.message || 'bilinmeyen hata'));
