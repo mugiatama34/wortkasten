@@ -1,5 +1,5 @@
 /* Wortkasten service worker — kabuk cache-first, kelime listesi network-first */
-const SURUM = 'wortkasten-v6';
+const SURUM = 'wortkasten-v7';
 const KABUK = ['./', './index.html', './manifest.json',
                './icon-180.png', './icon-192.png', './icon-512.png'];
 
@@ -16,8 +16,12 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+
+  // yapay zeka istekleri: hic cache'e girmesin, dogrudan aga gitsin
+  if (url.hostname === 'api.anthropic.com') return;
+
+  if (e.request.method !== 'GET') return;
 
   // kelime listesi: once agdan al, basarisizsa cache
   if (url.pathname.endsWith('kelimeler.json')) {
