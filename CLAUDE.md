@@ -97,13 +97,39 @@ kaldırma.
 3. Yeni bir alan eklediysen `README.md` içindeki veri modeli tablosunu
    ve bu dosyayı da güncelle.
 
+## Yapay zekâ entegrasyonu
+
+Kelime ekleme panelindeki "Cümle öner" düğmesi, girilen Almanca kelime,
+tür ve Türkçe karşılığını Anthropic'in Messages API'sine gönderip örnek
+cümle ve çevirisini önerir. Kullanıcı öneriyi kaydetmeden önce
+düzenleyebilir — otomatik kaydetme yok.
+
+- **Model adı** `index.html` başındaki `AI_MODEL` sabitinde tanımlı.
+  Değiştirmek için sadece o sabiti güncelle.
+- **API çağrısı doğrudan tarayıcıdan** `https://api.anthropic.com/v1/messages`
+  adresine `fetch` ile yapılır. SDK veya kütüphane yok. İstek
+  `anthropic-dangerous-direct-browser-access: true` başlığını taşımak
+  zorunda, yoksa CORS hatası alınır.
+- **Anahtar yönetimi:** Ayarlar panelindeki anahtar `localStorage`'da
+  ayrı bir anahtarda (`wortkasten:apiAnahtar`) tutulur. `kelimeler.json`
+  dosyasına ya da repodaki başka bir dosyaya asla yazılmaz, yedek
+  dışa aktarımına (Menü > Yedekle ve aktar) da dahil edilmez. API
+  anahtarı girilmemişse "Cümle öner" düğmesi arayüzde görünmez.
+- `sw.js`, `api.anthropic.com` isteklerini önbelleğe almadan doğrudan
+  ağa geçirir — bu istekleri cache mantığına dahil etme.
+
+Bu, tamamen otomatik kart üretiminden farklı: model sadece tek bir
+alan çifti (`cumle`, `cumle_tr`) için öneri üretir, kullanıcı onaylayıp
+kaydetmeden hiçbir şey kalıcı olmaz.
+
 ## Kapsam dışı bırakılanlar
 
 Bunlar unutulduğu için değil, bilinçli olarak yok. Talep gelmeden ekleme:
 
 - Sesli okuma / telaffuz
 - Cihazlar arası senkron
-- Yapay zekâ ile otomatik kart üretimi
+- Yapay zekâ ile tamamen otomatik kart üretimi (kelime, artikel, çoğul
+  gibi tüm alanların modelden gelmesi) — cümle önerisi kapsam dışı değil
 - Hesap sistemi
 
 ## Dil

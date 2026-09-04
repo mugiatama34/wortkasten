@@ -142,6 +142,10 @@ input,select,textarea{
 }
 textarea{min-height:66px;resize:vertical;line-height:1.45}
 .gizli{display:none}
+button:disabled{opacity:.55;cursor:default}
+.satir-flex{display:flex;gap:8px;align-items:stretch}
+.satir-flex input{flex:1}
+.satir-flex button{width:auto;padding:11px 14px;flex:0 0 auto}
 .birincil{
   padding:15px;border-radius:var(--r);background:var(--metin);color:var(--bg);
   font-weight:600;font-size:1rem;width:100%;
@@ -252,10 +256,12 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
     <label>Örnek cümle <span style="opacity:.7">— isteğe bağlı</span>
       <textarea id="fCumle" placeholder="Der neue {{Ansatz}} funktioniert gut."></textarea>
     </label>
+    <button type="button" class="ikincil gizli" id="fCumleOner">Cümle öner</button>
     <p class="yardim">
       Cümlede boşluğa dönüşmesini istediğin kelimeyi çift süslü parantez içine al:
       <code>{{Ansatz}}</code>. Cümle yazarsan bu kelime için üçüncü bir kart üretilir;
-      yazmazsan iki kart üretilir.
+      yazmazsan iki kart üretilir. "Cümle öner" düğmesi bu iki alanı yapay
+      zekâ ile doldurur, ama doğrudan kaydetmez — üzerinde düzenleme yapabilirsin.
     </p>
 
     <label>Cümlenin Türkçesi <span style="opacity:.7">— isteğe bağlı</span>
@@ -312,6 +318,19 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
       Alanı boş bırakırsan sınır uygulanmaz, o gün hiç görülmemiş tüm kelimeler kuyruğa
       girer — kelime listen küçükken uygundur, büyüdükçe bir sınır koymak işe yarar.
     </p>
+    <div class="ayirac"></div>
+    <label>Anthropic API anahtarı <span style="opacity:.7">— yapay zekâ ile cümle önerisi için, isteğe bağlı</span>
+      <div class="satir-flex">
+        <input id="aApiAnahtar" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+        <button type="button" class="ikincil" id="aApiGoster">Göster</button>
+      </div>
+    </label>
+    <p class="yardim">
+      Anahtar yalnızca bu cihazda, tarayıcı deposunda saklanır; kelime listesine
+      ya da repodaki başka bir dosyaya yazılmaz, doğrudan tarayıcından Anthropic'e
+      gönderilir. Anahtar girilmemişse yapay zekâ ile cümle önerisi arayüzde
+      görünmez.
+    </p>
     <button class="birincil" id="aKaydet">Kaydet</button>
     <div class="ayirac"></div>
     <button class="ikincil" id="aSifirla" style="color:var(--die)">Tüm ilerlemeyi sıfırla</button>
@@ -336,11 +355,15 @@ const K_ILERLEME  = 'wortkasten:ilerleme';
 const K_OZEL      = 'wortkasten:ozel';
 const K_AYAR      = 'wortkasten:ayar';
 const K_YENISECIM = 'wortkasten:yeniSecim';  // gunun yeni kelime secimi
+const K_APIANAHTAR = 'wortkasten:apiAnahtar';
+
+const AI_MODEL = 'claude-haiku-4-5-20251001';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
 let ILERLEME = {};    // kartId -> durum
 let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0 };
+let API_ANAHTARI = '';  // Anthropic API anahtari, sadece bu cihazda
 
 let kuyruk = [];
 let aktif = null;
@@ -798,7 +821,9 @@ function mYedekAltGuncelle() {
     : 'Kelimeleri ve ilerlemeyi dışa/içe aktar';
 }
 document.getElementById('mAyar').onclick = () => {
-  document.getElementById('aYeni').value = AYAR.yeniLimit === null ? '' : AYAR.yeniLimit; panelAc('pAyar');
+  document.getElementById('aYeni').value = AYAR.yeniLimit === null ? '' : AYAR.yeniLimit;
+  document.getElementById('aApiAnahtar').value = API_ANAHTARI;
+  panelAc('pAyar');
 };
 
 let toastZaman;
@@ -847,6 +872,99 @@ document.getElementById('fKaydet').onclick = () => {
   bildir(de + ' eklendi');
   kuyrukKur();
   document.getElementById('fDe').focus();
+};
+
+/* ---------- yapay zeka ile cumle onerisi ---------- */
+function aiDurumGuncelle() {
+  document.getElementById('fCumleOner').classList.toggle('gizli', !API_ANAHTARI);
+}
+
+async function cumleUret(de, tur, tr) {
+  const turMetin = { isim: 'isim', fiil: 'fiil', sifat: 'sıfat', diger: 'diğer' }[tur] || tur;
+  const artikel = tur === 'isim' ? document.getElementById('fArtikel').value : '';
+  const kelimeTam = artikel ? artikel + ' ' + de : de;
+
+  const istemMetni = `Almanca öğrenen Türkçe konuşan biri için örnek cümle üret.
+
+Kelime: ${kelimeTam}
+Tür: ${turMetin}
+Türkçe karşılığı: ${tr}
+
+B1 seviyesinde, günlük hayatta kurulabilecek doğal bir Almanca cümle yaz.
+Cümle en fazla 12 kelime olsun. Hedef kelimeyi cümlede geçtiği çekimli
+haliyle çift süslü parantez içine al, örnek: {{gegangen}}. Cümlenin Türkçe
+çevirisini de ekle.
+
+Yanıtın SADECE şu JSON formatında olsun, başka hiçbir metin, açıklama ya da
+markdown kod bloğu ekleme:
+{"cumle": "...", "cumle_tr": "..."}`;
+
+  let yanit;
+  try {
+    yanit = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': API_ANAHTARI,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        max_tokens: 300,
+        messages: [{ role: 'user', content: istemMetni }]
+      })
+    });
+  } catch (h) {
+    throw new Error('Ağ hatası — bağlantını kontrol et');
+  }
+
+  if (!yanit.ok) {
+    let mesaj = '';
+    try { const v = await yanit.json(); mesaj = (v.error && v.error.message) || ''; }
+    catch (h) { /* govde json degil, mesaj bos kalsin */ }
+    if (yanit.status === 401) throw new Error('Geçersiz API anahtarı');
+    if (/credit balance/i.test(mesaj)) throw new Error('Bakiye yetersiz');
+    throw new Error(mesaj || ('İstek başarısız (' + yanit.status + ')'));
+  }
+
+  let veri;
+  try { veri = await yanit.json(); }
+  catch (h) { throw new Error('Beklenmeyen yanıt formatı'); }
+
+  const metin = veri.content && veri.content[0] && veri.content[0].text;
+  if (!metin) throw new Error('Beklenmeyen yanıt formatı');
+
+  let sonuc;
+  try { sonuc = JSON.parse(metin); }
+  catch (h) { throw new Error('Beklenmeyen yanıt formatı'); }
+
+  if (!sonuc || typeof sonuc.cumle !== 'string' || typeof sonuc.cumle_tr !== 'string' ||
+      !sonuc.cumle.trim() || !sonuc.cumle.includes('{{') || !sonuc.cumle_tr.trim()) {
+    throw new Error('Beklenmeyen yanıt formatı');
+  }
+  return sonuc;
+}
+
+document.getElementById('fCumleOner').onclick = async () => {
+  const de = document.getElementById('fDe').value.trim();
+  const tr = document.getElementById('fTr').value.trim();
+  if (!de || !tr) { bildir('Cümle önermek için önce Almanca ve Türkçe alanlarını doldur'); return; }
+  if (!API_ANAHTARI) { bildir('Önce Ayarlar bölümünden API anahtarını gir'); return; }
+
+  const btn = document.getElementById('fCumleOner');
+  const eskiMetin = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Üretiliyor...';
+
+  try {
+    const sonuc = await cumleUret(de, fTur.value, tr);
+    document.getElementById('fCumle').value = sonuc.cumle;
+    document.getElementById('fCumleTr').value = sonuc.cumle_tr;
+  } catch (h) {
+    bildir(h.message || 'Cümle üretilemedi');
+  } finally {
+    btn.disabled = false; btn.textContent = eskiMetin;
+  }
 };
 
 /* ---------- istatistik ---------- */
@@ -964,6 +1082,14 @@ document.getElementById('yKopya').onclick = () => {
 };
 
 /* ---------- ayarlar ---------- */
+document.getElementById('aApiGoster').onclick = () => {
+  const i = document.getElementById('aApiAnahtar');
+  const btn = document.getElementById('aApiGoster');
+  const gosterecek = i.type === 'password';
+  i.type = gosterecek ? 'text' : 'password';
+  btn.textContent = gosterecek ? 'Gizle' : 'Göster';
+};
+
 document.getElementById('aKaydet').onclick = () => {
   const ham = document.getElementById('aYeni').value.trim();
   if (ham === '') {
@@ -973,6 +1099,11 @@ document.getElementById('aKaydet').onclick = () => {
     AYAR.yeniLimit = isNaN(v) ? 10 : Math.max(0, Math.min(200, v));
   }
   yaz(K_AYAR, AYAR);
+
+  API_ANAHTARI = document.getElementById('aApiAnahtar').value.trim();
+  yaz(K_APIANAHTAR, API_ANAHTARI);
+  aiDurumGuncelle();
+
   bildir('Ayarlar kaydedildi');
   kuyrukKur(); panelKapat(); ciz();
 };
@@ -1001,6 +1132,8 @@ async function baslat() {
   ILERLEME = oku(K_ILERLEME, {});
   OZEL = oku(K_OZEL, []);
   AYAR = Object.assign(AYAR, oku(K_AYAR, {}));
+  API_ANAHTARI = oku(K_APIANAHTAR, '') || '';
+  aiDurumGuncelle();
 
   let temel = [];
   try {
