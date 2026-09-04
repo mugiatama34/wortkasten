@@ -159,6 +159,12 @@ button:disabled{opacity:.55;cursor:default}
   display:flex;justify-content:space-between;padding:12px 14px;
   background:var(--yuzey);border:1px solid var(--cizgi);border-radius:10px;font-size:.92rem;
 }
+.liste-satir{
+  display:block;width:100%;text-align:left;padding:12px 14px;
+  background:var(--yuzey);border:1px solid var(--cizgi);border-radius:10px;
+}
+.liste-bas{font-size:1rem;font-weight:600}
+.liste-alt{font-size:.82rem;color:var(--sonuk);margin-top:2px}
 .ist-satir b{font-variant-numeric:tabular-nums}
 .ist-baslik{font-size:.82rem;color:var(--sonuk);margin:4px 0 -4px}
 .yuk-grafik{
@@ -211,6 +217,7 @@ button:disabled{opacity:.55;cursor:default}
   <div class="panel-icerik">
     <div class="menu-liste">
       <button id="mEkle">Kelime ekle<small>Yeni kelimeyi bu cihaza kaydeder</small></button>
+      <button id="mListe">Kelimeler<small>Tüm kelimeleri gör, düzenle</small></button>
       <button id="mIst">İstatistik<small>Kart sayıları ve ilerleme durumu</small></button>
       <button id="mYedek">Yedekle ve aktar<small id="mYedekAlt">Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
       <button id="mAyar">Ayarlar<small>Günlük yeni kelime sınırı</small></button>
@@ -222,9 +229,18 @@ button:disabled{opacity:.55;cursor:default}
   </div>
 </div>
 
-<!-- ==================== KELİME EKLE ==================== -->
+<!-- ==================== KELİMELER (liste) ==================== -->
+<div class="panel" id="pListe">
+  <div class="panel-bas"><h2>Kelimeler</h2><button data-kapat="pListe">Kapat</button></div>
+  <div class="panel-icerik">
+    <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
+    <div id="listeSonuc" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ==================== KELİME EKLE / DÜZENLE ==================== -->
 <div class="panel" id="pEkle">
-  <div class="panel-bas"><h2>Kelime ekle</h2><button data-kapat="pEkle">Kapat</button></div>
+  <div class="panel-bas"><h2 id="pEkleBaslik">Kelime ekle</h2><button data-kapat="pEkle">Kapat</button></div>
   <div class="panel-icerik">
     <label>Tür
       <select id="fTur">
@@ -276,8 +292,11 @@ button:disabled{opacity:.55;cursor:default}
       <input id="fCumleTr" autocomplete="off" placeholder="Yeni yaklaşım iyi çalışıyor.">
     </label>
 
+    <p class="yardim gizli" id="duzenleYalnizOku"></p>
     <button class="birincil" id="fKaydet">Kelimeyi kaydet</button>
     <p class="yardim" id="ekleYardim"></p>
+    <div class="ayirac gizli" id="fSilAyirac"></div>
+    <button class="ikincil gizli" id="fSil" style="color:var(--die)">Kelimeyi sil</button>
   </div>
 </div>
 
@@ -396,6 +415,7 @@ let kuyruk = [];
 let aktif = null;
 let acik = false;     // cevap gorunuyor mu
 let sonGeriAl = null;  // son puanlamayi geri almak icin — sadece bir adim
+let duzenlenenId = null;  // kelime ekleme formu duzenleme modundaysa duzenlenen kelimenin id'si
 
 /* ==========================================================
    Depolama
@@ -801,14 +821,14 @@ function bosEkran() {
       <p>Kelime listesi yüklenemedi. Menüden kendi kelimelerini ekleyebilir
       ya da repodaki kelimeler.json dosyasını kontrol edebilirsin.</p>
       <button id="bosEkle">Kelime ekle</button></div>`;
-    document.getElementById('bosEkle').onclick = () => panelAc('pEkle');
+    document.getElementById('bosEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
   } else {
     const sonraki = enYakinTarih();
     ana.innerHTML = `<div class="durum">
       <h2>Bugünlük bitti</h2>
       <p>${sonraki ? 'Sıradaki tekrar: ' + sonraki : 'Bekleyen kart yok.'}</p>
       <button id="bosEkle">Kelime ekle</button></div>`;
-    document.getElementById('bosEkle').onclick = () => panelAc('pEkle');
+    document.getElementById('bosEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
   }
   alt.innerHTML = geriAlBtn();
   geriAlBagla();
@@ -836,8 +856,10 @@ function panelKapat() {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('acik'));
 }
 document.querySelectorAll('[data-kapat]').forEach(b => b.onclick = panelKapat);
+document.querySelector('#pEkle [data-kapat]').onclick = () => { panelKapat(); formuTemizle(); };
 document.getElementById('menuAc').onclick = () => panelAc('pMenu');
-document.getElementById('mEkle').onclick = () => panelAc('pEkle');
+document.getElementById('mEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
+document.getElementById('mListe').onclick = () => { listeCiz(); panelAc('pListe'); };
 document.getElementById('mIst').onclick  = () => { istCiz(); panelAc('pIst'); };
 document.getElementById('mYedek').onclick = () => panelAc('pYedek');
 
@@ -871,24 +893,86 @@ fTur.onchange = () => {
   document.getElementById('lFormlar').classList.toggle('gizli', t !== 'fiil');
 };
 
-document.getElementById('fKaydet').onclick = () => {
-  const de = document.getElementById('fDe').value.trim();
-  const tr = document.getElementById('fTr').value.trim();
-  if (!de || !tr) { bildir('Almanca ve Türkçe alanları gerekli'); return; }
+function ozelMi(id) {
+  return OZEL.some(k => k.id === id);
+}
 
+// duzenlenenId'ye gore formun basligini, kaydet/sil dugmelerini ve
+// salt okunur notunu gunceller
+function ekleModuGuncelle() {
+  const baslik = document.getElementById('pEkleBaslik');
+  const kaydetBtn = document.getElementById('fKaydet');
+  const silBtn = document.getElementById('fSil');
+  const silAyirac = document.getElementById('fSilAyirac');
+  const notEl = document.getElementById('duzenleYalnizOku');
+
+  if (!duzenlenenId) {
+    baslik.textContent = 'Kelime ekle';
+    kaydetBtn.textContent = 'Kelimeyi kaydet';
+    kaydetBtn.disabled = false;
+    silBtn.classList.add('gizli');
+    silAyirac.classList.add('gizli');
+    notEl.classList.add('gizli');
+    return;
+  }
+
+  baslik.textContent = 'Kelime düzenle';
+  kaydetBtn.textContent = 'Değişiklikleri kaydet';
+  silBtn.classList.remove('gizli');
+  silAyirac.classList.remove('gizli');
+
+  const salinOku = !ozelMi(duzenlenenId) && !GH_TOKEN;
+  kaydetBtn.disabled = salinOku;
+  notEl.classList.toggle('gizli', !salinOku);
+  if (salinOku) {
+    notEl.textContent = 'Bu kelime kelimeler.json dosyasından geliyor. Değişikliği kaydetmek ' +
+      'için Ayarlar\'dan bir GitHub token girmen gerekir.';
+  }
+}
+
+// forma bir kelimenin alanlarini doldurur, duzenleme modunu acar
+function formuDoldur(k) {
+  duzenlenenId = k.id;
+  fTur.value = k.tur;
+  fTur.onchange();
+  document.getElementById('fArtikel').value = k.artikel || 'der';
+  document.getElementById('fDe').value = k.de || '';
+  document.getElementById('fCogul').value = k.cogul || '';
+  document.getElementById('fFormlar').value = k.formlar || '';
+  document.getElementById('fTr').value = k.tr || '';
+  document.getElementById('fCumle').value = k.cumle || '';
+  document.getElementById('fCumleTr').value = k.cumle_tr || '';
+  ekleModuGuncelle();
+}
+
+// formu bosaltir, ekleme moduna doner
+function formuTemizle() {
+  ['fDe', 'fTr', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
+    document.getElementById(i).value = '';
+  });
+  duzenlenenId = null;
+  ekleModuGuncelle();
+}
+
+function formdanKelimeOku() {
   const tur = fTur.value;
-  const kelime = {
-    id: 'u' + Date.now().toString(36),
-    tur, de, tr,
+  const govde = {
+    tur,
+    de: document.getElementById('fDe').value.trim(),
+    tr: document.getElementById('fTr').value.trim(),
     cumle: document.getElementById('fCumle').value.trim(),
     cumle_tr: document.getElementById('fCumleTr').value.trim()
   };
   if (tur === 'isim') {
-    kelime.artikel = document.getElementById('fArtikel').value;
-    kelime.cogul = document.getElementById('fCogul').value.trim();
+    govde.artikel = document.getElementById('fArtikel').value;
+    govde.cogul = document.getElementById('fCogul').value.trim();
   }
-  if (tur === 'fiil') kelime.formlar = document.getElementById('fFormlar').value.trim();
+  if (tur === 'fiil') govde.formlar = document.getElementById('fFormlar').value.trim();
+  return govde;
+}
 
+function kelimeEkle(govde) {
+  const kelime = Object.assign({ id: 'u' + Date.now().toString(36) }, govde);
   OZEL.push(kelime);
   yaz(K_OZEL, OZEL);
   KELIMELER.push(kelime);
@@ -899,14 +983,108 @@ document.getElementById('fKaydet').onclick = () => {
     yaz(K_BEKLEYEN, BEKLEYEN);
   }
 
-  ['fDe', 'fTr', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
-    document.getElementById(i).value = '';
-  });
-  bildir(de + ' eklendi');
+  formuTemizle();
+  bildir(kelime.de + ' eklendi');
   kuyrukKur();
   document.getElementById('fDe').focus();
 
   if (GH_TOKEN) senkronEt();
+}
+
+// duzenleme kaydedildikten / kelime silindikten sonra listeye don
+function formKapatVeYenile() {
+  formuTemizle();
+  mYedekAltGuncelle();
+  kuyrukKur();
+  listeCiz();
+  panelAc('pListe');
+}
+
+async function kelimeGuncelle(id, govde) {
+  const eskiIndex = KELIMELER.findIndex(k => k.id === id);
+  if (eskiIndex === -1) return;
+  const yeniKelime = Object.assign({ id }, govde);
+
+  const ozelIndex = OZEL.findIndex(k => k.id === id);
+  if (ozelIndex !== -1) {
+    OZEL[ozelIndex] = yeniKelime;
+    yaz(K_OZEL, OZEL);
+    KELIMELER[eskiIndex] = yeniKelime;
+    bildir(yeniKelime.de + ' güncellendi');
+    formKapatVeYenile();
+    return;
+  }
+
+  if (!GH_TOKEN) { bildir('Kaydetmek için önce Ayarlar\'dan GitHub token gir'); return; }
+
+  const kaydetBtn = document.getElementById('fKaydet');
+  const eskiMetin = kaydetBtn.textContent;
+  kaydetBtn.disabled = true; kaydetBtn.textContent = 'Kaydediliyor...';
+  try {
+    await ghKelimeGuncelle(yeniKelime);
+    KELIMELER[eskiIndex] = yeniKelime;
+    bildir(yeniKelime.de + ' repoda güncellendi');
+    formKapatVeYenile();
+  } catch (h) {
+    bildir('Repoya yazılamadı: ' + (h.message || 'bilinmeyen hata'));
+  } finally {
+    kaydetBtn.disabled = false; kaydetBtn.textContent = eskiMetin;
+  }
+}
+
+function ilerlemeTemizle(id) {
+  let degisti = false;
+  for (const yon of ['de-tr', 'tr-de', 'cumle']) {
+    const kartId = id + ':' + yon;
+    if (kartId in ILERLEME) { delete ILERLEME[kartId]; degisti = true; }
+  }
+  if (degisti) yaz(K_ILERLEME, ILERLEME);
+}
+
+document.getElementById('fKaydet').onclick = () => {
+  const govde = formdanKelimeOku();
+  if (!govde.de || !govde.tr) { bildir('Almanca ve Türkçe alanları gerekli'); return; }
+
+  if (duzenlenenId) kelimeGuncelle(duzenlenenId, govde);
+  else kelimeEkle(govde);
+};
+
+document.getElementById('fSil').onclick = async () => {
+  if (!duzenlenenId) return;
+  const k = KELIMELER.find(x => x.id === duzenlenenId);
+  if (!k) return;
+  if (!confirm(k.de + ' kelimesi silinsin mi? Bu işlem geri alınamaz.')) return;
+
+  const silBtn = document.getElementById('fSil');
+  const ozelIndex = OZEL.findIndex(x => x.id === duzenlenenId);
+
+  if (ozelIndex !== -1) {
+    OZEL.splice(ozelIndex, 1);
+    yaz(K_OZEL, OZEL);
+    const bIndex = BEKLEYEN.findIndex(x => x.id === duzenlenenId);
+    if (bIndex !== -1) { BEKLEYEN.splice(bIndex, 1); yaz(K_BEKLEYEN, BEKLEYEN); }
+    ilerlemeTemizle(duzenlenenId);
+    KELIMELER = KELIMELER.filter(x => x.id !== duzenlenenId);
+    bildir(k.de + ' silindi');
+    formKapatVeYenile();
+    return;
+  }
+
+  if (!GH_TOKEN) { bildir('Silmek için önce Ayarlar\'dan GitHub token gir'); return; }
+
+  const eskiMetin = silBtn.textContent;
+  silBtn.disabled = true; silBtn.textContent = 'Siliniyor...';
+  try {
+    await ghKelimeSil(duzenlenenId, k.de);
+    ilerlemeTemizle(duzenlenenId);
+    KELIMELER = KELIMELER.filter(x => x.id !== duzenlenenId);
+    bildir(k.de + ' repodan silindi');
+    formKapatVeYenile();
+  } catch (h) {
+    bildir('Repodan silinemedi: ' + (h.message || 'bilinmeyen hata'));
+  } finally {
+    silBtn.disabled = false; silBtn.textContent = eskiMetin;
+  }
 };
 
 /* ---------- yapay zeka ile cumle onerisi ---------- */
@@ -1076,12 +1254,11 @@ async function ghKelimelerOku() {
   return { json: JSON.parse(base64ToUtf8(veri.content)), sha: veri.sha };
 }
 
-async function ghKelimeleriYaz(yeniKelimeler, tekrarMi) {
+// kelimeler.json'un icerigini okuyup donusturucu(liste) ile degistirir ve
+// geri yazar; ekleme/guncelleme/silme akislarinin ortak govdesi
+async function ghKelimelerYazGovde(donusturucu, mesaj, tekrarMi) {
   const { json, sha } = await ghKelimelerOku();
-  json.kelimeler = (json.kelimeler || []).concat(yeniKelimeler);
-  const mesaj = yeniKelimeler.length === 1
-    ? 'Kelime ekle: ' + yeniKelimeler[0].de
-    : yeniKelimeler.length + ' kelime ekle';
+  json.kelimeler = donusturucu(json.kelimeler || []);
 
   let yanit;
   try {
@@ -1104,12 +1281,33 @@ async function ghKelimeleriYaz(yeniKelimeler, tekrarMi) {
 
   if (yanit.status === 409) {
     if (tekrarMi) throw new Error('Dosya sürekli değişiyor, çakışma çözülemedi — tekrar dene');
-    return ghKelimeleriYaz(yeniKelimeler, true);
+    return ghKelimelerYazGovde(donusturucu, mesaj, true);
   }
   if (!yanit.ok) {
     const hataMesaji = await ghHataMesaji(yanit);
     throw new Error(hataMesaji || ('İstek başarısız (HTTP ' + yanit.status + ')'));
   }
+}
+
+async function ghKelimeleriYaz(yeniKelimeler) {
+  const mesaj = yeniKelimeler.length === 1
+    ? 'Kelime ekle: ' + yeniKelimeler[0].de
+    : yeniKelimeler.length + ' kelime ekle';
+  return ghKelimelerYazGovde(liste => liste.concat(yeniKelimeler), mesaj);
+}
+
+async function ghKelimeGuncelle(kelime) {
+  return ghKelimelerYazGovde(
+    liste => liste.map(k => k.id === kelime.id ? kelime : k),
+    'Kelime güncelle: ' + kelime.de
+  );
+}
+
+async function ghKelimeSil(id, adi) {
+  return ghKelimelerYazGovde(
+    liste => liste.filter(k => k.id !== id),
+    'Kelime sil: ' + adi
+  );
 }
 
 async function senkronEt() {
@@ -1142,6 +1340,70 @@ function ghDurumGuncelle() {
       '"Eklenen kelimeleri kopyala" ile kopyalayıp o dosyaya eklemen gerekir, ya da Ayarlar\'dan ' +
       'bir GitHub token girip otomatik senkronu açman gerekir.';
 }
+
+/* ---------- kelime listesi ---------- */
+const DURUM_ETIKET = { yeni: 'hiç görülmemiş', ogrenme: 'öğreniliyor', tekrar: 'tekrar aşamasında' };
+
+// kelime id -> o kelimenin kart id'leri
+function kelimeKartHaritasi() {
+  const harita = new Map();
+  for (const kart of kartlar()) {
+    if (!harita.has(kart.k.id)) harita.set(kart.k.id, []);
+    harita.get(kart.k.id).push(kart.id);
+  }
+  return harita;
+}
+
+// kelimenin ogrenme durumu: kartlarindan en uzun araliga sahip olanina gore
+function kelimeDurumu(kartIdleri) {
+  let gorulduMu = false, enBuyukAralik = -1, enSonAsama = null;
+  for (const id of kartIdleri) {
+    const d = ILERLEME[id];
+    if (!d) continue;
+    gorulduMu = true;
+    const aralik = d.aralik || 0;
+    if (aralik > enBuyukAralik) { enBuyukAralik = aralik; enSonAsama = d.asama; }
+  }
+  if (!gorulduMu) return 'yeni';
+  return enSonAsama === 'tekrar' ? 'tekrar' : 'ogrenme';
+}
+
+function listeCiz() {
+  const q = document.getElementById('lArama').value.trim().toLocaleLowerCase('tr-TR');
+  const harita = kelimeKartHaritasi();
+  const el = document.getElementById('listeSonuc');
+
+  const siralanan = KELIMELER.slice().sort((a, b) => a.de.localeCompare(b.de, 'de'));
+  const gosterilecek = q
+    ? siralanan.filter(k =>
+        k.de.toLocaleLowerCase('tr-TR').includes(q) || k.tr.toLocaleLowerCase('tr-TR').includes(q))
+    : siralanan;
+
+  if (!gosterilecek.length) {
+    el.innerHTML = `<p class="yardim">Eşleşen kelime yok.</p>`;
+    return;
+  }
+
+  el.innerHTML = gosterilecek.map(k => {
+    const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+    const kartIdleri = harita.get(k.id) || [];
+    const durum = kelimeDurumu(kartIdleri);
+    return `<button class="liste-satir" data-id="${kac(k.id)}">
+      <div class="liste-bas">${kac(bas)}</div>
+      <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}</div>
+    </button>`;
+  }).join('');
+
+  el.querySelectorAll('[data-id]').forEach(b => {
+    b.onclick = () => {
+      const k = KELIMELER.find(x => x.id === b.dataset.id);
+      if (!k) return;
+      formuDoldur(k);
+      panelAc('pEkle');
+    };
+  });
+}
+document.getElementById('lArama').oninput = listeCiz;
 
 /* ---------- istatistik ---------- */
 
