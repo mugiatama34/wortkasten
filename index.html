@@ -947,6 +947,15 @@ async function anthropicIstek(govde) {
   return veri;
 }
 
+// Model yaniti ``` veya ```json ile sarabiliyor, basina aciklama cumlesi
+// ekleyebiliyor; ilk { ile son } arasini alip JSON.parse'a onu veriyoruz.
+function jsonAyikla(metin) {
+  const ilk = metin.indexOf('{');
+  const son = metin.lastIndexOf('}');
+  if (ilk === -1 || son === -1 || son < ilk) return metin.trim();
+  return metin.slice(ilk, son + 1);
+}
+
 async function cumleUret(de, tur, tr) {
   const turMetin = { isim: 'isim', fiil: 'fiil', sifat: 'sıfat', diger: 'diğer' }[tur] || tur;
   const artikel = tur === 'isim' ? document.getElementById('fArtikel').value : '';
@@ -974,17 +983,37 @@ markdown kod bloğu ekleme:
   });
 
   const metin = veri.content && veri.content[0] && veri.content[0].text;
-  if (!metin) throw new Error('Beklenmeyen yanıt formatı');
+  if (!metin) {
+    throw new Error('Beklenmeyen yanıt formatı (content.text yok) — ham yanıt: ' +
+      JSON.stringify(veri).slice(0, 200));
+  }
+
+  if (veri.stop_reason === 'max_tokens') {
+    throw new Error('Yanıt yarıda kesildi (max_tokens sınırına takıldı) — ham metin: ' +
+      metin.slice(0, 200));
+  }
 
   let sonuc;
-  try { sonuc = JSON.parse(metin); }
-  catch (h) { throw new Error('Beklenmeyen yanıt formatı'); }
-
-  if (!sonuc || typeof sonuc.cumle !== 'string' || typeof sonuc.cumle_tr !== 'string' ||
-      !sonuc.cumle.trim() || !sonuc.cumle.includes('{{') || !sonuc.cumle_tr.trim()) {
-    throw new Error('Beklenmeyen yanıt formatı');
+  try { sonuc = JSON.parse(jsonAyikla(metin)); }
+  catch (h) {
+    throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 200));
   }
-  return sonuc;
+  if (!sonuc || typeof sonuc !== 'object') {
+    throw new Error('Yanıt bir JSON nesnesi değil — ham metin: ' + metin.slice(0, 200));
+  }
+
+  const eksik = [];
+  if (typeof sonuc.cumle !== 'string' || !sonuc.cumle.trim()) eksik.push('cumle');
+  if (typeof sonuc.cumle_tr !== 'string' || !sonuc.cumle_tr.trim()) eksik.push('cumle_tr');
+  if (eksik.length) {
+    throw new Error('Yanıtta ' + eksik.join(' ve ') + ' alanı eksik ya da boş — ham metin: ' +
+      metin.slice(0, 200));
+  }
+  if (!sonuc.cumle.includes('{{')) {
+    throw new Error('Cümlede hedef kelime {{ }} ile işaretlenmemiş — ham metin: ' + metin.slice(0, 200));
+  }
+
+  return { cumle: sonuc.cumle, cumle_tr: sonuc.cumle_tr };
 }
 
 document.getElementById('fCumleOner').onclick = async () => {
