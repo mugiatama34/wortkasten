@@ -303,12 +303,14 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
   <div class="panel-bas"><h2>Ayarlar</h2><button data-kapat="pAyar">Kapat</button></div>
   <div class="panel-icerik">
     <label>Günlük yeni kelime sınırı
-      <input id="aYeni" type="number" min="0" max="200" inputmode="numeric">
+      <input id="aYeni" type="number" min="0" max="200" inputmode="numeric" placeholder="sınırsız">
     </label>
     <p class="yardim">
       Her yeni kelime 2–3 kart üretir ve ilerleyen günlerde tekrar yükü olarak geri gelir.
       Günde 10 kelime birkaç hafta içinde günlük 60–80 kartlık bir tekrar yüküne oturur.
       Sınırı yükseltmeden önce mevcut yüke bak.
+      Alanı boş bırakırsan sınır uygulanmaz, o gün hiç görülmemiş tüm kelimeler kuyruğa
+      girer — kelime listen küçükken uygundur, büyüdükçe bir sınır koymak işe yarar.
     </p>
     <button class="birincil" id="aKaydet">Kaydet</button>
     <div class="ayirac"></div>
@@ -465,7 +467,8 @@ function kuyrukKur() {
   let secim = oku(K_YENISECIM, null);
   if (!secim || secim.gun !== gun) {
     const kelimeIdleri = karistir([...new Set(yeni.map(kart => kart.k.id))]);
-    secim = { gun, idler: kelimeIdleri.slice(0, AYAR.yeniLimit) };
+    const idler = AYAR.yeniLimit === null ? kelimeIdleri : kelimeIdleri.slice(0, AYAR.yeniLimit);
+    secim = { gun, idler };
     yaz(K_YENISECIM, secim);
   }
   const secilenKelimeler = new Set(secim.idler);
@@ -795,7 +798,7 @@ function mYedekAltGuncelle() {
     : 'Kelimeleri ve ilerlemeyi dışa/içe aktar';
 }
 document.getElementById('mAyar').onclick = () => {
-  document.getElementById('aYeni').value = AYAR.yeniLimit; panelAc('pAyar');
+  document.getElementById('aYeni').value = AYAR.yeniLimit === null ? '' : AYAR.yeniLimit; panelAc('pAyar');
 };
 
 let toastZaman;
@@ -912,7 +915,7 @@ function istCiz() {
     satir('Öğrenme aşamasında', ogr) +
     satir('Tekrar aşamasında', tek) +
     satir('Olgun kart (21+ gün)', olgun) +
-    satir('Bugün çalışılan yeni kart', AYAR.yeniSayac + ' / ' + AYAR.yeniLimit) +
+    satir('Bugün çalışılan yeni kart', AYAR.yeniLimit === null ? AYAR.yeniSayac : (AYAR.yeniSayac + ' / ' + AYAR.yeniLimit)) +
     `<p class="yardim">Olgun kart, aralığı 21 günü aşmış kartlar. Bu sayının düzenli
      artması öğrenmenin kalıcı hale geldiğini gösterir.</p>` +
     `<div class="ist-baslik">Önümüzdeki 7 gün — tekrar yükü</div>` +
@@ -962,8 +965,13 @@ document.getElementById('yKopya').onclick = () => {
 
 /* ---------- ayarlar ---------- */
 document.getElementById('aKaydet').onclick = () => {
-  const v = parseInt(document.getElementById('aYeni').value, 10);
-  AYAR.yeniLimit = isNaN(v) ? 10 : Math.max(0, Math.min(200, v));
+  const ham = document.getElementById('aYeni').value.trim();
+  if (ham === '') {
+    AYAR.yeniLimit = null;
+  } else {
+    const v = parseInt(ham, 10);
+    AYAR.yeniLimit = isNaN(v) ? 10 : Math.max(0, Math.min(200, v));
+  }
   yaz(K_AYAR, AYAR);
   bildir('Ayarlar kaydedildi');
   kuyrukKur(); panelKapat(); ciz();
