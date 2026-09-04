@@ -200,7 +200,7 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
     <div class="menu-liste">
       <button id="mEkle">Kelime ekle<small>Yeni kelimeyi bu cihaza kaydeder</small></button>
       <button id="mIst">İstatistik<small>Kart sayıları ve ilerleme durumu</small></button>
-      <button id="mYedek">Yedekle ve aktar<small>Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
+      <button id="mYedek">Yedekle ve aktar<small id="mYedekAlt">Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
       <button id="mAyar">Ayarlar<small>Günlük yeni kelime sınırı</small></button>
     </div>
     <p class="yardim">
@@ -263,6 +263,11 @@ textarea{min-height:66px;resize:vertical;line-height:1.45}
     </label>
 
     <button class="birincil" id="fKaydet">Kelimeyi kaydet</button>
+    <p class="yardim">
+      Bu kelime yalnızca bu cihaza kaydedilir, repodaki <code>kelimeler.json</code> dosyasına
+      yazılmaz. Kalıcı hale getirmek için Menü &gt; Yedekle ve aktar bölümünden
+      "Eklenen kelimeleri kopyala" ile kopyalayıp o dosyaya eklemen gerekir.
+    </p>
   </div>
 </div>
 
@@ -782,6 +787,13 @@ document.getElementById('menuAc').onclick = () => panelAc('pMenu');
 document.getElementById('mEkle').onclick = () => panelAc('pEkle');
 document.getElementById('mIst').onclick  = () => { istCiz(); panelAc('pIst'); };
 document.getElementById('mYedek').onclick = () => panelAc('pYedek');
+
+function mYedekAltGuncelle() {
+  const el = document.getElementById('mYedekAlt');
+  el.textContent = OZEL.length
+    ? OZEL.length + ' kelime henüz repoya aktarılmadı'
+    : 'Kelimeleri ve ilerlemeyi dışa/içe aktar';
+}
 document.getElementById('mAyar').onclick = () => {
   document.getElementById('aYeni').value = AYAR.yeniLimit; panelAc('pAyar');
 };
@@ -824,6 +836,7 @@ document.getElementById('fKaydet').onclick = () => {
   OZEL.push(kelime);
   yaz(K_OZEL, OZEL);
   KELIMELER.push(kelime);
+  mYedekAltGuncelle();
 
   ['fDe', 'fTr', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
     document.getElementById(i).value = '';
@@ -996,6 +1009,7 @@ async function baslat() {
   fTur.onchange();
   kuyrukKur();
   ciz();
+  mYedekAltGuncelle();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
