@@ -1,5 +1,5 @@
 /* Wortkasten service worker — kabuk cache-first, kelime listesi network-first */
-const SURUM = 'wortkasten-v7';
+const SURUM = 'wortkasten-v8';
 const KABUK = ['./', './index.html', './manifest.json',
                './icon-180.png', './icon-192.png', './icon-512.png'];
 
@@ -18,8 +18,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // yapay zeka istekleri: hic cache'e girmesin, dogrudan aga gitsin
-  if (url.hostname === 'api.anthropic.com') return;
+  // yapay zeka ve github yazma istekleri: hic cache'e girmesin, dogrudan aga gitsin
+  if (url.hostname === 'api.anthropic.com' || url.hostname === 'api.github.com') return;
 
   if (e.request.method !== 'GET') return;
 

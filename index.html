@@ -269,11 +269,7 @@ button:disabled{opacity:.55;cursor:default}
     </label>
 
     <button class="birincil" id="fKaydet">Kelimeyi kaydet</button>
-    <p class="yardim">
-      Bu kelime yalnızca bu cihaza kaydedilir, repodaki <code>kelimeler.json</code> dosyasına
-      yazılmaz. Kalıcı hale getirmek için Menü &gt; Yedekle ve aktar bölümünden
-      "Eklenen kelimeleri kopyala" ile kopyalayıp o dosyaya eklemen gerekir.
-    </p>
+    <p class="yardim" id="ekleYardim"></p>
   </div>
 </div>
 
@@ -331,6 +327,19 @@ button:disabled{opacity:.55;cursor:default}
       gönderilir. Anahtar girilmemişse yapay zekâ ile cümle önerisi arayüzde
       görünmez.
     </p>
+    <div class="ayirac"></div>
+    <label>GitHub token <span style="opacity:.7">— eklenen kelimeleri repoya otomatik yazmak için, isteğe bağlı</span>
+      <div class="satir-flex">
+        <input id="aGhToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_...">
+        <button type="button" class="ikincil" id="aGhGoster">Göster</button>
+      </div>
+    </label>
+    <p class="yardim">
+      Token yalnızca bu cihazda, tarayıcı deposunda saklanır; repodaki hiçbir dosyaya
+      yazılmaz. <code>kelimeler.json</code> dosyasını değiştirebilmek için "Contents"
+      için yazma izni olan bir token gerekir. Token girilmemişse yeni kelimeler bu
+      cihazda kalır, repoya elle taşıman gerekir.
+    </p>
     <button class="birincil" id="aKaydet">Kaydet</button>
     <div class="ayirac"></div>
     <button class="ikincil" id="aSifirla" style="color:var(--die)">Tüm ilerlemeyi sıfırla</button>
@@ -356,14 +365,21 @@ const K_OZEL      = 'wortkasten:ozel';
 const K_AYAR      = 'wortkasten:ayar';
 const K_YENISECIM = 'wortkasten:yeniSecim';  // gunun yeni kelime secimi
 const K_APIANAHTAR = 'wortkasten:apiAnahtar';
+const K_GHTOKEN   = 'wortkasten:ghToken';
+const K_BEKLEYEN  = 'wortkasten:beklenenKelimeler';  // henuz repoya yazilmamis kelimeler
 
 const AI_MODEL = 'claude-haiku-4-5-20251001';
+const GITHUB_SAHIP = 'mugiatama34';
+const GITHUB_REPO  = 'wortkasten';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
 let ILERLEME = {};    // kartId -> durum
 let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0 };
 let API_ANAHTARI = '';  // Anthropic API anahtari, sadece bu cihazda
+let GH_TOKEN = '';      // GitHub token, sadece bu cihazda
+let BEKLEYEN = [];      // GH_TOKEN varsa: repoya henuz yazilamamis kelimeler
+let senkronDevamEdiyor = false;
 
 let kuyruk = [];
 let aktif = null;
@@ -823,6 +839,7 @@ function mYedekAltGuncelle() {
 document.getElementById('mAyar').onclick = () => {
   document.getElementById('aYeni').value = AYAR.yeniLimit === null ? '' : AYAR.yeniLimit;
   document.getElementById('aApiAnahtar').value = API_ANAHTARI;
+  document.getElementById('aGhToken').value = GH_TOKEN;
   panelAc('pAyar');
 };
 
@@ -866,12 +883,19 @@ document.getElementById('fKaydet').onclick = () => {
   KELIMELER.push(kelime);
   mYedekAltGuncelle();
 
+  if (GH_TOKEN) {
+    BEKLEYEN.push(kelime);
+    yaz(K_BEKLEYEN, BEKLEYEN);
+  }
+
   ['fDe', 'fTr', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
     document.getElementById(i).value = '';
   });
   bildir(de + ' eklendi');
   kuyrukKur();
   document.getElementById('fDe').focus();
+
+  if (GH_TOKEN) senkronEt();
 };
 
 /* ---------- yapay zeka ile cumle onerisi ---------- */
@@ -966,6 +990,90 @@ document.getElementById('fCumleOner').onclick = async () => {
     btn.disabled = false; btn.textContent = eskiMetin;
   }
 };
+
+/* ---------- github senkron ---------- */
+function utf8ToBase64(metin) {
+  const bayt = new TextEncoder().encode(metin);
+  let ikili = '';
+  bayt.forEach(b => { ikili += String.fromCharCode(b); });
+  return btoa(ikili);
+}
+function base64ToUtf8(b64) {
+  const ikili = atob(b64.replace(/\s/g, ''));
+  const bayt = new Uint8Array(ikili.length);
+  for (let i = 0; i < ikili.length; i++) bayt[i] = ikili.charCodeAt(i);
+  return new TextDecoder().decode(bayt);
+}
+
+const GH_ICERIK_URL = `https://api.github.com/repos/${GITHUB_SAHIP}/${GITHUB_REPO}/contents/kelimeler.json`;
+
+async function ghKelimelerOku() {
+  const yanit = await fetch(GH_ICERIK_URL, {
+    headers: { 'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json' }
+  });
+  if (!yanit.ok) throw new Error('okuma-basarisiz');
+  const veri = await yanit.json();
+  return { json: JSON.parse(base64ToUtf8(veri.content)), sha: veri.sha };
+}
+
+async function ghKelimeleriYaz(yeniKelimeler, tekrarMi) {
+  const { json, sha } = await ghKelimelerOku();
+  json.kelimeler = (json.kelimeler || []).concat(yeniKelimeler);
+  const mesaj = yeniKelimeler.length === 1
+    ? 'Kelime ekle: ' + yeniKelimeler[0].de
+    : yeniKelimeler.length + ' kelime ekle';
+
+  const yanit = await fetch(GH_ICERIK_URL, {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer ' + GH_TOKEN,
+      'Accept': 'application/vnd.github+json',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: mesaj,
+      content: utf8ToBase64(JSON.stringify(json, null, 2) + '\n'),
+      sha
+    })
+  });
+
+  if (yanit.status === 409) {
+    if (tekrarMi) throw new Error('cakisma');
+    return ghKelimeleriYaz(yeniKelimeler, true);
+  }
+  if (!yanit.ok) throw new Error('yazma-basarisiz');
+}
+
+async function senkronEt() {
+  if (!GH_TOKEN || !BEKLEYEN.length || senkronDevamEdiyor) return;
+  senkronDevamEdiyor = true;
+  const gonderilecek = BEKLEYEN.slice();
+  try {
+    await ghKelimeleriYaz(gonderilecek);
+    const idler = new Set(gonderilecek.map(k => k.id));
+    BEKLEYEN = BEKLEYEN.filter(k => !idler.has(k.id));
+    yaz(K_BEKLEYEN, BEKLEYEN);
+    bildir(gonderilecek.length === 1
+      ? gonderilecek[0].de + ' repoya senkronize edildi'
+      : gonderilecek.length + ' kelime repoya senkronize edildi');
+  } catch (h) {
+    bildir('Kelime bu cihazda güvende, bağlantı kurulunca tekrar denenecek');
+  } finally {
+    senkronDevamEdiyor = false;
+  }
+}
+
+function ghDurumGuncelle() {
+  const el = document.getElementById('ekleYardim');
+  if (!el) return;
+  el.innerHTML = GH_TOKEN
+    ? 'Kelime önce bu cihaza kaydedilir ve hemen görünür. Repodaki <code>kelimeler.json</code> ' +
+      'dosyasına yazma arka planda olur, bağlantı yoksa bir sonraki kelimeyle birlikte tekrar denenir.'
+    : 'Bu kelime yalnızca bu cihaza kaydedilir, repodaki <code>kelimeler.json</code> dosyasına ' +
+      'yazılmaz. Kalıcı hale getirmek için Menü &gt; Yedekle ve aktar bölümünden ' +
+      '"Eklenen kelimeleri kopyala" ile kopyalayıp o dosyaya eklemen gerekir, ya da Ayarlar\'dan ' +
+      'bir GitHub token girip otomatik senkronu açman gerekir.';
+}
 
 /* ---------- istatistik ---------- */
 
@@ -1090,6 +1198,14 @@ document.getElementById('aApiGoster').onclick = () => {
   btn.textContent = gosterecek ? 'Gizle' : 'Göster';
 };
 
+document.getElementById('aGhGoster').onclick = () => {
+  const i = document.getElementById('aGhToken');
+  const btn = document.getElementById('aGhGoster');
+  const gosterecek = i.type === 'password';
+  i.type = gosterecek ? 'text' : 'password';
+  btn.textContent = gosterecek ? 'Gizle' : 'Göster';
+};
+
 document.getElementById('aKaydet').onclick = () => {
   const ham = document.getElementById('aYeni').value.trim();
   if (ham === '') {
@@ -1104,8 +1220,13 @@ document.getElementById('aKaydet').onclick = () => {
   yaz(K_APIANAHTAR, API_ANAHTARI);
   aiDurumGuncelle();
 
+  GH_TOKEN = document.getElementById('aGhToken').value.trim();
+  yaz(K_GHTOKEN, GH_TOKEN);
+  ghDurumGuncelle();
+
   bildir('Ayarlar kaydedildi');
   kuyrukKur(); panelKapat(); ciz();
+  if (GH_TOKEN) senkronEt();
 };
 
 document.getElementById('aSifirla').onclick = () => {
@@ -1134,6 +1255,9 @@ async function baslat() {
   AYAR = Object.assign(AYAR, oku(K_AYAR, {}));
   API_ANAHTARI = oku(K_APIANAHTAR, '') || '';
   aiDurumGuncelle();
+  GH_TOKEN = oku(K_GHTOKEN, '') || '';
+  BEKLEYEN = oku(K_BEKLEYEN, []);
+  ghDurumGuncelle();
 
   let temel = [];
   try {

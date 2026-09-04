@@ -15,8 +15,13 @@ Bu kısıtlar bilinçli. Değiştirmek gerektiğini düşünüyorsan önce sor.
   Ayrı `.css` veya `.js` dosyasına bölme. Tek istisna `sw.js`, o ayrı
   olmak zorunda.
 - **Sunucu yok.** Statik dosyalar GitHub Pages'ten servis ediliyor.
-  Backend, API çağrısı, hesap sistemi yok.
-- **Veri cihazda kalır.** `localStorage`. Bulut senkronu yok.
+  Backend, hesap sistemi yok. API çağrıları (Anthropic, GitHub) doğrudan
+  tarayıcıdan yapılır, aradan geçen kendi sunucumuz yok.
+- **Veri cihazda kalır.** `localStorage`. İlerleme (`ILERLEME`, tekrar
+  geçmişi) hiçbir zaman cihaz dışına çıkmaz, cihazlar arası senkronu
+  yok. Tek istisna: GitHub token girilmişse yeni eklenen kelimeler
+  (sadece kelime verisi, ilerleme değil) repodaki `kelimeler.json`
+  dosyasına yazılır — bkz. "GitHub kelime senkronu".
 
 Sebep: kullanıcı çoğunlukla telefondan ve GitHub'ın web arayüzünden
 çalışıyor. Derleme adımı eklersen projeyi kendi cihazından bakım
@@ -122,12 +127,45 @@ Bu, tamamen otomatik kart üretiminden farklı: model sadece tek bir
 alan çifti (`cumle`, `cumle_tr`) için öneri üretir, kullanıcı onaylayıp
 kaydetmeden hiçbir şey kalıcı olmaz.
 
+## GitHub kelime senkronu
+
+Ayarlar panelindeki GitHub token girilmişse, kelime ekleme panelinden
+kaydedilen her yeni kelime arka planda GitHub Contents API üzerinden
+repodaki `kelimeler.json` dosyasına da yazılır. Bu, ilerleme/tekrar
+verisini değil, sadece yeni eklenen kelimeleri kapsar — "Veri cihazda
+kalır" kısıtına bu yönüyle istisnadır, kullanıcının açık isteğiyle
+eklendi.
+
+- **Repo sahibi/adı** `index.html` başındaki `GITHUB_SAHIP` ve
+  `GITHUB_REPO` sabitlerinde tanımlı.
+- **Akış:** kelime önce `localStorage`'a (`OZEL`) kaydedilir ve
+  arayüzde hemen görünür. Token varsa aynı kelime `BEKLEYEN`
+  listesine de eklenir ve `senkronEt()` arka planda tetiklenir —
+  kullanıcı beklemez. `senkronEt()`, Contents API'den güncel `sha`'yı
+  okuyup kelimeyi ekler ve `PUT` ile geri yazar; 409 çakışmasında
+  `sha`'yı bir kez daha okuyup tekrar dener. Başarılı olursa kelime
+  `BEKLEYEN`'den çıkar (`OZEL`'de kalır — manuel yedekleme için).
+  Başarısız olursa kelime `BEKLEYEN`'de kalır ve bir sonraki kelime
+  eklendiğinde birlikte tekrar denenir.
+- **Base64/UTF-8:** `btoa`/`atob` Almanca/Türkçe karakterlerde
+  (ä ö ü ß ğ ş ı) doğrudan çalışmaz. `utf8ToBase64()` /
+  `base64ToUtf8()` yardımcıları `TextEncoder`/`TextDecoder` ile bunu
+  çözer — bu ikisini bypass edip doğrudan `btoa`/`atob` kullanma.
+- **Token yönetimi:** Ayarlar panelindeki token `localStorage`'da ayrı
+  bir anahtarda (`wortkasten:ghToken`) tutulur. API anahtarı gibi
+  repoya ya da yedek dışa aktarımına asla dahil edilmez. Token
+  girilmemişse bu akış hiç çalışmaz, mevcut manuel kopyalama yöntemi
+  (Menü > Yedekle ve aktar) geçerli kalır.
+- `sw.js`, `api.github.com` isteklerini de `api.anthropic.com` gibi
+  önbelleğe almadan doğrudan ağa geçirir.
+
 ## Kapsam dışı bırakılanlar
 
 Bunlar unutulduğu için değil, bilinçli olarak yok. Talep gelmeden ekleme:
 
 - Sesli okuma / telaffuz
-- Cihazlar arası senkron
+- İlerleme/tekrar geçmişinin cihazlar arası senkronu (kelime verisinin
+  GitHub'a yazılması hariç — bkz. "GitHub kelime senkronu")
 - Yapay zekâ ile tamamen otomatik kart üretimi (kelime, artikel, çoğul
   gibi tüm alanların modelden gelmesi) — cümle önerisi kapsam dışı değil
 - Hesap sistemi
