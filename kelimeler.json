@@ -318,6 +318,172 @@
       "cumle_tr": "Şirketimizin geliri bu yıl arttı.",
       "artikel": "der",
       "cogul": ""
+    },
+    {
+      "id": "umtn92tt00",
+      "tur": "fiil",
+      "de": "sich beschweren",
+      "tr": "şikayet etmek",
+      "cumle": "Der Kunde {{beschwert sich}} über die Webseite.",
+      "cumle_tr": "Müşteri web sitesi hakkında şikayet ediyor.",
+      "formlar": "beschwert sich, beschwerte sich, hat sich beschwert"
+    },
+    {
+      "id": "umtn92tt01",
+      "tur": "fiil",
+      "de": "weiterleiten",
+      "tr": "yönlendirmek",
+      "cumle": "Bitte {{leiten}} Sie die E-Mail an mich {{weiter}}.",
+      "cumle_tr": "Lütfen e-postayı bana yönlendirin.",
+      "formlar": "leitet weiter, leitete weiter, hat weitergeleitet"
+    },
+    {
+      "id": "umtn92tt02",
+      "tur": "isim",
+      "de": "Beschwerde",
+      "tr": "şikayet",
+      "cumle": "Die {{Beschwerde}} des Kunden war berechtigt.",
+      "cumle_tr": "Müşterinin şikayeti haklıydı.",
+      "artikel": "die",
+      "cogul": "Beschwerden"
+    },
+    {
+      "id": "umtn92tt03",
+      "tur": "fiil",
+      "de": "reagieren",
+      "tr": "tepki vermek",
+      "cumle": "Wir müssen schnell auf die Beschwerde {{reagieren}}.",
+      "cumle_tr": "Şikayete hızlıca tepki vermeliyiz.",
+      "formlar": "reagiert, reagierte, hat reagiert"
+    },
+    {
+      "id": "umtn92tt04",
+      "tur": "fiil",
+      "de": "verlinken",
+      "tr": "bağlantı vermek",
+      "cumle": "Die Menüpunkte sind falsch {{verlinkt}}.",
+      "cumle_tr": "Menü öğeleri yanlış bağlantılanmış.",
+      "formlar": "verlinkt, verlinkte, hat verlinkt"
+    },
+    {
+      "id": "umtn92tt05",
+      "tur": "isim",
+      "de": "Ansicht",
+      "tr": "görünüm",
+      "cumle": "Die {{Ansicht}} auf dem Handy ist fehlerhaft.",
+      "cumle_tr": "Telefondaki görünüm hatalı.",
+      "artikel": "die",
+      "cogul": "Ansichten"
+    },
+    {
+      "id": "umtn92tt06",
+      "tur": "fiil",
+      "de": "anpassen",
+      "tr": "uyarlamak",
+      "cumle": "Die Größe muss sich automatisch {{anpassen}}.",
+      "cumle_tr": "Boyut otomatik olarak uyarlanmalı.",
+      "formlar": "passt an, passte an, hat angepasst"
+    },
+    {
+      "id": "umtn92tt07",
+      "tur": "fiil",
+      "de": "aktivieren",
+      "tr": "etkinleştirmek",
+      "cumle": "Die Webseite soll heute {{aktiviert}} werden.",
+      "cumle_tr": "Web sitesi bugün etkinleştirilmeli.",
+      "formlar": "aktiviert, aktivierte, hat aktiviert"
+    },
+    {
+      "id": "umtn92tt08",
+      "tur": "fiil",
+      "de": "beheben",
+      "tr": "gidermek",
+      "cumle": "Der Techniker soll den Fehler {{beheben}}.",
+      "cumle_tr": "Teknisyen hatayı gidermeli.",
+      "formlar": "behebt, behob, hat behoben"
+    },
+    {
+      "id": "umtn92tt09",
+      "tur": "isim",
+      "de": "Fehler",
+      "tr": "hata",
+      "cumle": "Der {{Fehler}} auf der Seite wurde schnell gefunden.",
+      "cumle_tr": "Sayfadaki hata hızlıca bulundu.",
+      "artikel": "der",
+      "cogul": "Fehler"
+    },
+    {
+      "id": "umtn92tt0a",
+      "tur": "isim",
+      "de": "Neustart",
+      "tr": "yeniden başlatma",
+      "cumle": "Nach dem {{Neustart}} funktioniert die Seite wieder.",
+      "cumle_tr": "Yeniden başlatmadan sonra sayfa tekrar çalışıyor.",
+      "artikel": "der",
+      "cogul": "Neustarts"
+    },
+    {
+      "id": "umtn92tt0b",
+      "tur": "fiil",
+      "de": "vereinbaren",
+      "tr": "kararlaştırmak",
+      "cumle": "Wir haben einen neuen Termin {{vereinbart}}.",
+      "cumle_tr": "Yeni bir randevu kararlaştırdık.",
+      "formlar": "vereinbart, vereinbarte, hat vereinbart"
+    },
+    {
+      "id": "umtn92tt0c",
+      "tur": "sifat",
+      "de": "erheblich",
+      "tr": "önemli/ciddi",
+      "cumle": "Das war ein {{erheblicher}} Fehler in unserem System.",
+      "cumle_tr": "Bu, sistemimizdeki ciddi bir hataydı."
+    },
+    {
+      "id": "umtn92tt0d",
+      "tur": "isim",
+      "de": "Betrag",
+      "tr": "tutar",
+      "cumle": "Der {{Betrag}} wurde bereits überwiesen.",
+      "cumle_tr": "Tutar zaten transfer edildi.",
+      "artikel": "der",
+      "cogul": "Beträge"
+    },
+    {
+      "id": "umtn92tt0e",
+      "tur": "fiil",
+      "de": "auflisten",
+      "tr": "listelemek",
+      "cumle": "Alle Probleme sind im Dokument {{aufgelistet}}.",
+      "cumle_tr": "Tüm sorunlar belgede listelenmiş.",
+      "formlar": "listet auf, listete auf, hat aufgelistet"
+    },
+    {
+      "id": "umtn92tt0f",
+      "tur": "isim",
+      "de": "Verzögerung",
+      "tr": "gecikme",
+      "cumle": "Die {{Verzögerung}} hat viele Kunden verärgert.",
+      "cumle_tr": "Gecikme birçok müşteriyi kızdırdı.",
+      "artikel": "die",
+      "cogul": "Verzögerungen"
+    },
+    {
+      "id": "umtn92tt0g",
+      "tur": "fiil",
+      "de": "versprechen",
+      "tr": "söz vermek",
+      "cumle": "Der Service wurde uns nicht wie {{versprochen}} geliefert.",
+      "cumle_tr": "Hizmet bize söz verildiği gibi sunulmadı.",
+      "formlar": "verspricht, versprach, hat versprochen"
+    },
+    {
+      "id": "umtn92tt0h",
+      "tur": "sifat",
+      "de": "lesbar",
+      "tr": "okunabilir",
+      "cumle": "Der Text auf dem Handy ist kaum {{lesbar}}.",
+      "cumle_tr": "Telefondaki metin neredeyse okunamıyor."
     }
   ]
 }
