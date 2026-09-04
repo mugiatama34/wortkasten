@@ -165,6 +165,14 @@ button:disabled{opacity:.55;cursor:default}
 }
 .liste-bas{font-size:1rem;font-weight:600}
 .liste-alt{font-size:.82rem;color:var(--sonuk);margin-top:2px}
+.foto-oge{
+  display:flex;flex-direction:column;gap:8px;
+  background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);
+  padding:14px;
+}
+.foto-oge-ust{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--sonuk)}
+.foto-oge-ust input{width:auto}
+.foto-tekrar{color:var(--uyari);font-weight:600}
 .ist-satir b{font-variant-numeric:tabular-nums}
 .ist-baslik{font-size:.82rem;color:var(--sonuk);margin:4px 0 -4px}
 .yuk-grafik{
@@ -217,6 +225,7 @@ button:disabled{opacity:.55;cursor:default}
   <div class="panel-icerik">
     <div class="menu-liste">
       <button id="mEkle">Kelime ekle<small>Yeni kelimeyi bu cihaza kaydeder</small></button>
+      <button id="mFoto">Fotoğraftan ekle<small>Kamera veya galeriden Almanca kelime çıkar</small></button>
       <button id="mListe">Kelimeler<small>Tüm kelimeleri gör, düzenle</small></button>
       <button id="mIst">İstatistik<small>Kart sayıları ve ilerleme durumu</small></button>
       <button id="mYedek">Yedekle ve aktar<small id="mYedekAlt">Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
@@ -297,6 +306,23 @@ button:disabled{opacity:.55;cursor:default}
     <p class="yardim" id="ekleYardim"></p>
     <div class="ayirac gizli" id="fSilAyirac"></div>
     <button class="ikincil gizli" id="fSil" style="color:var(--die)">Kelimeyi sil</button>
+  </div>
+</div>
+
+<!-- ==================== FOTOĞRAFTAN EKLE ==================== -->
+<div class="panel" id="pFoto">
+  <div class="panel-bas"><h2>Fotoğraftan ekle</h2><button data-kapat="pFoto">Kapat</button></div>
+  <div class="panel-icerik">
+    <p class="yardim">
+      Ders kitabı sayfası ya da not fotoğrafı çek. Sayfadaki B1 ve üzeri
+      Almanca kelimeler otomatik çıkarılır; A1/A2 kelimeler, özel isimler
+      ve sayılar elenir. Listede zaten olan kelimeler ayrıca işaretlenir.
+    </p>
+    <input type="file" id="fotoDosya" accept="image/*" capture="environment" class="gizli">
+    <button type="button" class="birincil" id="fotoSec">Fotoğraf seç</button>
+    <div id="fotoDurum"></div>
+    <div id="fotoSonuc" style="display:flex;flex-direction:column;gap:10px"></div>
+    <button type="button" class="birincil gizli" id="fotoEkleBtn">Seçilenleri ekle</button>
   </div>
 </div>
 
@@ -399,6 +425,7 @@ const K_GHTOKEN   = 'wortkasten:ghToken';
 const K_BEKLEYEN  = 'wortkasten:beklenenKelimeler';  // henuz repoya yazilmamis kelimeler
 
 const AI_MODEL = 'claude-haiku-4-5-20251001';
+const AI_GORSEL_MODEL = 'claude-sonnet-5';
 const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
@@ -416,6 +443,7 @@ let aktif = null;
 let acik = false;     // cevap gorunuyor mu
 let sonGeriAl = null;  // son puanlamayi geri almak icin — sadece bir adim
 let duzenlenenId = null;  // kelime ekleme formu duzenleme modundaysa duzenlenen kelimenin id'si
+let fotoAdaylar = [];  // fotograftan cikarilan, onay bekleyen kelime adaylari
 
 /* ==========================================================
    Depolama
@@ -971,18 +999,27 @@ function formdanKelimeOku() {
   return govde;
 }
 
-function kelimeEkle(govde) {
-  const kelime = Object.assign({ id: 'u' + Date.now().toString(36) }, govde);
-  OZEL.push(kelime);
+// bir ya da daha fazla kelime govdesini OZEL/KELIMELER/BEKLEYEN'e ekler;
+// senkronEt() cagirmaz, cagiran taraf kendi bildirimini ve senkronunu yapar
+function kelimeleriEkleGovde(govdeListesi) {
+  const zamanTabani = Date.now().toString(36);
+  const eklenenler = govdeListesi.map((govde, i) =>
+    Object.assign({ id: 'u' + zamanTabani + i.toString(36) }, govde));
+
+  OZEL.push(...eklenenler);
   yaz(K_OZEL, OZEL);
-  KELIMELER.push(kelime);
+  KELIMELER.push(...eklenenler);
   mYedekAltGuncelle();
 
   if (GH_TOKEN) {
-    BEKLEYEN.push(kelime);
+    BEKLEYEN.push(...eklenenler);
     yaz(K_BEKLEYEN, BEKLEYEN);
   }
+  return eklenenler;
+}
 
+function kelimeEkle(govde) {
+  const [kelime] = kelimeleriEkleGovde([govde]);
   formuTemizle();
   bildir(kelime.de + ' eklendi');
   kuyrukKur();
@@ -1213,6 +1250,292 @@ document.getElementById('fCumleOner').onclick = async () => {
   } finally {
     btn.disabled = false; btn.textContent = eskiMetin;
   }
+};
+
+/* ---------- fotograftan kelime cikarma ---------- */
+
+// telefon fotograflari cok buyuk; agir/pahali gonderimi ve boyut sinirini
+// onlemek icin canvas ile kucultup JPEG'e cevirir. Uzun kenar en fazla
+// 1500px, kalite 0.8. Donen deger sadece base64 govde (data: onegi olmadan).
+function gorselKucult(dosya) {
+  return new Promise((resolve, reject) => {
+    const MAKS = 1500;
+    const img = new Image();
+    const url = URL.createObjectURL(dosya);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) { reject(new Error('Fotoğraf okunamadı — daha net bir fotoğraf çekmeyi dene')); return; }
+      if (w > MAKS || h > MAKS) {
+        if (w >= h) { h = Math.round(h * MAKS / w); w = MAKS; }
+        else { w = Math.round(w * MAKS / h); h = MAKS; }
+      }
+      const tuval = document.createElement('canvas');
+      tuval.width = w; tuval.height = h;
+      const ctx = tuval.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(tuval.toDataURL('image/jpeg', 0.8).split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Fotoğraf okunamadı — daha net bir fotoğraf çekmeyi dene')); };
+    img.src = url;
+  });
+}
+
+// Model yaniti dizi disi metin de sarabiliyor; ilk [ ile son ] arasini
+// alip JSON.parse'a onu veriyoruz — jsonAyikla'nin dizi hali.
+function diziAyikla(metin) {
+  const ilk = metin.indexOf('[');
+  const son = metin.lastIndexOf(']');
+  if (ilk === -1 || son === -1 || son < ilk) return metin.trim();
+  return metin.slice(ilk, son + 1);
+}
+
+const FOTO_TURLER = ['isim', 'fiil', 'sifat', 'diger'];
+const FOTO_ARTIKELLER = ['der', 'die', 'das'];
+
+// modelden gelen ham ogeyi guvenli, tum alanlari string olan bir nesneye cevirir
+function fotoOgeTemizle(o) {
+  return {
+    tur: FOTO_TURLER.includes(o.tur) ? o.tur : 'diger',
+    de: o.de.trim(),
+    artikel: FOTO_ARTIKELLER.includes(o.artikel) ? o.artikel : 'der',
+    cogul: typeof o.cogul === 'string' ? o.cogul.trim() : '',
+    formlar: typeof o.formlar === 'string' ? o.formlar.trim() : '',
+    tr: o.tr.trim(),
+    seviye: typeof o.seviye === 'string' ? o.seviye.trim() : '',
+    cumle: typeof o.cumle === 'string' ? o.cumle.trim() : '',
+    cumle_tr: typeof o.cumle_tr === 'string' ? o.cumle_tr.trim() : ''
+  };
+}
+
+async function gorselKelimeCikar(base64Jpeg, ilerlemeFn) {
+  const mevcutKelimeler = KELIMELER.map(k => k.de).join(', ') || '(liste boş)';
+  const istemMetni = `Bu fotoğraftaki sayfada geçen Almanca kelimeleri çıkar.
+
+Her kelime için şu alanları üret:
+- de: temel biçim (isimlerde tekil yalın hâl, fiillerde mastar)
+- tur: "isim", "fiil", "sifat" ya da "diger"
+- artikel: sadece isimlerde ("der"/"die"/"das")
+- cogul: sadece isimlerde, çoğul biçim
+- formlar: sadece fiillerde, "geht, ging, ist gegangen" biçiminde
+- tr: Türkçe karşılığı
+- seviye: kelimenin CEFR seviyesi tahmini — "A1", "A2", "B1", "B2" ya da "C1"
+- cumle: B1-B2 seviyesinde, en fazla 12 kelimelik, yeni kurulmuş doğal bir
+  Almanca cümle. Sayfadaki cümlenin birebir aynısı olmasın, ama kelimenin
+  sayfada geçtiği bağlamdan da kopmasın. Hedef kelimeyi çekimli hâliyle
+  çift süslü parantez içine al, örnek: {{gegangen}}.
+- cumle_tr: cumle alanının Türkçe çevirisi
+
+Şunları ELE: A1 ve A2 seviyesindeki kelimeler, özel isimler, sayılar.
+
+Şu kelimeler zaten listede var, bunları tekrar çıkarma:
+${mevcutKelimeler}
+
+Yanıtın SADECE bir JSON dizisi olsun, başka hiçbir metin, açıklama ya da
+markdown kod bloğu ekleme. Örnek:
+[{"de":"Ansatz","tur":"isim","artikel":"der","cogul":"Ansätze","tr":"yaklaşım","seviye":"B1","cumle":"Der neue {{Ansatz}} funktioniert gut.","cumle_tr":"Yeni yaklaşım iyi çalışıyor."}]`;
+
+  if (ilerlemeFn) ilerlemeFn('Gönderiliyor...');
+
+  const veri = await anthropicIstek({
+    model: AI_GORSEL_MODEL,
+    max_tokens: 4096,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
+        { type: 'text', text: istemMetni }
+      ]
+    }]
+  });
+
+  if (ilerlemeFn) ilerlemeFn('Okunuyor...');
+
+  const metin = veri.content && veri.content[0] && veri.content[0].text;
+  if (!metin) {
+    throw new Error('Beklenmeyen yanıt formatı (content.text yok) — ham yanıt: ' +
+      JSON.stringify(veri).slice(0, 300));
+  }
+  if (veri.stop_reason === 'max_tokens') {
+    throw new Error('Yanıt yarıda kesildi (max_tokens sınırına takıldı) — ham metin: ' +
+      metin.slice(0, 300));
+  }
+
+  let sonuc;
+  try { sonuc = JSON.parse(diziAyikla(metin)); }
+  catch (h) {
+    throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 300));
+  }
+  if (!Array.isArray(sonuc)) {
+    throw new Error('Yanıt bir JSON dizisi değil — ham metin: ' + metin.slice(0, 300));
+  }
+
+  sonuc = sonuc
+    .filter(o => o && typeof o === 'object' && typeof o.de === 'string' && o.de.trim() &&
+                 typeof o.tr === 'string' && o.tr.trim())
+    .map(fotoOgeTemizle);
+
+  if (!sonuc.length) {
+    throw new Error('Fotoğrafta uygun kelime bulunamadı — daha net ve daha yakından çekmeyi dene');
+  }
+  return sonuc;
+}
+
+// karsilastirma icin: artikel varsa bastan at, kucuk harfe indirge
+function kelimeAnahtari(de) {
+  return (de || '').trim().replace(/^(der|die|das)\s+/i, '').toLocaleLowerCase('tr-TR');
+}
+
+function fotoDurumGoster(mesaj, hataMi) {
+  const el = document.getElementById('fotoDurum');
+  el.innerHTML = mesaj
+    ? `<p class="yardim" style="color:${hataMi ? 'var(--die)' : 'var(--sonuk)'}">${kac(mesaj)}</p>`
+    : '';
+}
+
+function fotoOgeHtml(a, i, tekrarMi) {
+  return `<div class="foto-oge" data-idx="${i}">
+    <div class="foto-oge-ust">
+      <input type="checkbox" id="fo-sec-${i}" ${tekrarMi ? '' : 'checked'}>
+      <span>${a.seviye ? kac(a.seviye) : ''}${tekrarMi ? ' · <span class="foto-tekrar">listede zaten var</span>' : ''}</span>
+    </div>
+    <label>Tür
+      <select id="fo-tur-${i}">
+        <option value="isim">isim</option>
+        <option value="fiil">fiil</option>
+        <option value="sifat">sıfat</option>
+        <option value="diger">diğer</option>
+      </select>
+    </label>
+    <div class="satir-flex">
+      <label id="fo-artikelAlan-${i}" style="flex:0 0 auto;min-width:90px">Artikel
+        <select id="fo-artikel-${i}">
+          <option value="der">der</option>
+          <option value="die">die</option>
+          <option value="das">das</option>
+        </select>
+      </label>
+      <label style="flex:1">Almanca
+        <input id="fo-de-${i}" autocomplete="off" value="${kac(a.de)}">
+      </label>
+    </div>
+    <label id="fo-cogulAlan-${i}">Çoğul
+      <input id="fo-cogul-${i}" autocomplete="off" value="${kac(a.cogul)}">
+    </label>
+    <label id="fo-formlarAlan-${i}" class="gizli">Fiil formları
+      <input id="fo-formlar-${i}" autocomplete="off" value="${kac(a.formlar)}">
+    </label>
+    <label>Türkçe
+      <input id="fo-tr-${i}" autocomplete="off" value="${kac(a.tr)}">
+    </label>
+    <label>Örnek cümle
+      <textarea id="fo-cumle-${i}">${kac(a.cumle)}</textarea>
+    </label>
+    <label>Cümlenin Türkçesi
+      <input id="fo-cumletr-${i}" autocomplete="off" value="${kac(a.cumle_tr)}">
+    </label>
+  </div>`;
+}
+
+function fotoOgeBagla(i) {
+  const a = fotoAdaylar[i];
+  const turSel = document.getElementById(`fo-tur-${i}`);
+  const guncelle = () => {
+    const t = turSel.value;
+    document.getElementById(`fo-artikelAlan-${i}`).classList.toggle('gizli', t !== 'isim');
+    document.getElementById(`fo-cogulAlan-${i}`).classList.toggle('gizli', t !== 'isim');
+    document.getElementById(`fo-formlarAlan-${i}`).classList.toggle('gizli', t !== 'fiil');
+  };
+  turSel.value = a.tur;
+  turSel.onchange = guncelle;
+  guncelle();
+  document.getElementById(`fo-artikel-${i}`).value = a.artikel;
+}
+
+function fotoSonucCiz() {
+  const el = document.getElementById('fotoSonuc');
+  const mevcutAnahtarlar = new Set(KELIMELER.map(k => kelimeAnahtari(k.de)));
+
+  el.innerHTML = fotoAdaylar.map((a, i) =>
+    fotoOgeHtml(a, i, mevcutAnahtarlar.has(kelimeAnahtari(a.de)))
+  ).join('');
+  fotoAdaylar.forEach((a, i) => fotoOgeBagla(i));
+  document.getElementById('fotoEkleBtn').classList.toggle('gizli', !fotoAdaylar.length);
+}
+
+function fotoPaneliSifirla() {
+  fotoAdaylar = [];
+  fotoDurumGoster('');
+  fotoSonucCiz();
+  document.getElementById('fotoSec').disabled = false;
+}
+
+document.getElementById('mFoto').onclick = () => { fotoPaneliSifirla(); panelAc('pFoto'); };
+document.getElementById('fotoSec').onclick = () => document.getElementById('fotoDosya').click();
+
+document.getElementById('fotoDosya').onchange = async (e) => {
+  const dosya = e.target.files[0];
+  e.target.value = '';  // ayni dosyayi tekrar secebilmek icin
+  if (!dosya) return;
+
+  if (!API_ANAHTARI) {
+    fotoDurumGoster('Önce Ayarlar\'dan Anthropic API anahtarını gir', true);
+    return;
+  }
+
+  fotoAdaylar = [];
+  fotoSonucCiz();
+  const secBtn = document.getElementById('fotoSec');
+  secBtn.disabled = true;
+
+  try {
+    fotoDurumGoster('Küçültülüyor...');
+    const b64 = await gorselKucult(dosya);
+
+    const sonuc = await gorselKelimeCikar(b64, fotoDurumGoster);
+
+    fotoAdaylar = sonuc;
+    fotoDurumGoster(fotoAdaylar.length + ' kelime bulundu');
+    fotoSonucCiz();
+  } catch (h) {
+    fotoDurumGoster(h.message || 'Fotoğraf işlenemedi — daha net bir fotoğraf çekmeyi dene', true);
+  } finally {
+    secBtn.disabled = false;
+  }
+};
+
+document.getElementById('fotoEkleBtn').onclick = () => {
+  const govdeler = [];
+  fotoAdaylar.forEach((a, i) => {
+    const sec = document.getElementById(`fo-sec-${i}`);
+    if (!sec || !sec.checked) return;
+
+    const tur = document.getElementById(`fo-tur-${i}`).value;
+    const de = document.getElementById(`fo-de-${i}`).value.trim();
+    const tr = document.getElementById(`fo-tr-${i}`).value.trim();
+    if (!de || !tr) return;
+
+    const govde = {
+      tur, de, tr,
+      cumle: document.getElementById(`fo-cumle-${i}`).value.trim(),
+      cumle_tr: document.getElementById(`fo-cumletr-${i}`).value.trim()
+    };
+    if (tur === 'isim') {
+      govde.artikel = document.getElementById(`fo-artikel-${i}`).value;
+      govde.cogul = document.getElementById(`fo-cogul-${i}`).value.trim();
+    }
+    if (tur === 'fiil') govde.formlar = document.getElementById(`fo-formlar-${i}`).value.trim();
+    govdeler.push(govde);
+  });
+
+  if (!govdeler.length) { bildir('Eklenecek kelime seçilmedi'); return; }
+
+  const eklenenler = kelimeleriEkleGovde(govdeler);
+  bildir(eklenenler.length === 1 ? eklenenler[0].de + ' eklendi' : eklenenler.length + ' kelime eklendi');
+  kuyrukKur();
+  fotoPaneliSifirla();
+  panelKapat();
+  if (GH_TOKEN) senkronEt();
 };
 
 /* ---------- github senkron ---------- */

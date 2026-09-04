@@ -127,6 +127,43 @@ Bu, tamamen otomatik kart üretiminden farklı: model sadece tek bir
 alan çifti (`cumle`, `cumle_tr`) için öneri üretir, kullanıcı onaylayıp
 kaydetmeden hiçbir şey kalıcı olmaz.
 
+### Fotoğraftan kelime çıkarma
+
+Menüdeki "Fotoğraftan ekle" girişi, kamera ya da galeriden seçilen bir
+sayfa fotoğrafındaki Almanca kelimeleri görsel destekleyen bir modelle
+çıkarır ve onay ekranında listeler. Bu da "Cümle öner" gibi öneri
+niteliğinde — kullanıcı onaylayıp "Seçilenleri ekle"ye basmadan hiçbir
+kelime kaydedilmez.
+
+- **Görüntü hazırlama:** Gönderilmeden önce canvas ile küçültülür — uzun
+  kenar en fazla 1500px, JPEG kalite 0,8. Bu adım hem isteği hem
+  maliyeti küçük tutar, telefon fotoğrafları boyut sınırına takılmasın
+  diye eklendi.
+- **Model adı** `index.html` başındaki `AI_GORSEL_MODEL` sabitinde,
+  varsayılan `claude-sonnet-5`. `AI_MODEL` (cümle önerisi için) ayrı
+  kalır — görsel anlama gerektirmeyen istekler için daha ucuz/hızlı
+  modeli kullanmaya devam eder.
+- **İstek formatı:** tek mesajda önce `image` bloğu (`source.type`
+  `"base64"`, `media_type` `"image/jpeg"`), sonra `text` bloğu. Model
+  mevcut kelime listesindeki Almanca temel biçimleri de istem içinde
+  görür ve bunları tekrar çıkarmaması söylenir.
+- **Yanıt** sadece bir JSON dizisi olmalı; ayrıştırma mevcut
+  `jsonAyikla` mantığının dizi hali (`diziAyikla`) ile ilk `[` ile son
+  `]` arasını alır, ham metni hata mesajına ekler — cümle önerisiyle
+  aynı dayanıklılık yaklaşımı.
+- **Onay ekranı:** her aday kelime düzenlenebilir alanlarla (tür,
+  artikel, Almanca, çoğul/formlar, Türkçe, cümle, cümle çevirisi) ve
+  bir onay kutusuyla gösterilir — OCR ve model tahmini hata yapabilir.
+  Mevcut listede zaten olan kelimeler (artikelsiz, küçük harfe
+  indirgenerek karşılaştırılır) işaretlenir ve varsayılan olarak
+  işaretsiz gelir. "Seçilenleri ekle" işaretli kelimeleri mevcut kelime
+  ekleme akışına sokar — GitHub senkronu dahil.
+- Modelin ürettiği `seviye` alanı (CEFR tahmini) sadece onay ekranında
+  gösterilir, A1/A2 kelimelerin ayıklanmasına yardımcı olur; kaydedilen
+  kelime nesnesine dahil edilmez, veri modelinde yeni bir alan değildir.
+- `sw.js`, görsel çıkarma isteklerini de aynı `api.anthropic.com`
+  isteği olarak cache'lemeden ağa geçirir — ayrı bir kural gerekmez.
+
 ## GitHub kelime senkronu
 
 Ayarlar panelindeki GitHub token girilmişse, kelime ekleme panelinden
