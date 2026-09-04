@@ -1162,6 +1162,24 @@ async function anthropicIstek(govde) {
   return veri;
 }
 
+// content dizisini sirayla degil turune gore okur — extended thinking acik
+// modellerde dizinin ilk elemani {"type":"thinking",...} olabiliyor, asil
+// metin ilerideki bir "text" blogunda geliyor.
+function yanitMetni(veri) {
+  const bloklar = (veri && Array.isArray(veri.content)) ? veri.content : [];
+  const metin = bloklar.filter(b => b && b.type === 'text').map(b => b.text).join('\n');
+
+  if (veri && veri.stop_reason === 'max_tokens') {
+    throw new Error('Yanıt yarıda kesildi (max_tokens sınırına takıldı)' +
+      (metin ? ' — ham metin: ' + metin.slice(0, 300) : ''));
+  }
+  if (!metin) {
+    const turler = bloklar.map(b => b && b.type).join(', ') || '(boş)';
+    throw new Error('Beklenmeyen yanıt formatı (text bloğu yok) — gelen blok türleri: ' + turler);
+  }
+  return metin;
+}
+
 // Model yaniti ``` veya ```json ile sarabiliyor, basina aciklama cumlesi
 // ekleyebiliyor; ilk { ile son } arasini alip JSON.parse'a onu veriyoruz.
 function jsonAyikla(metin) {
@@ -1197,16 +1215,7 @@ markdown kod bloğu ekleme:
     messages: [{ role: 'user', content: istemMetni }]
   });
 
-  const metin = veri.content && veri.content[0] && veri.content[0].text;
-  if (!metin) {
-    throw new Error('Beklenmeyen yanıt formatı (content.text yok) — ham yanıt: ' +
-      JSON.stringify(veri).slice(0, 200));
-  }
-
-  if (veri.stop_reason === 'max_tokens') {
-    throw new Error('Yanıt yarıda kesildi (max_tokens sınırına takıldı) — ham metin: ' +
-      metin.slice(0, 200));
-  }
+  const metin = yanitMetni(veri);
 
   let sonuc;
   try { sonuc = JSON.parse(jsonAyikla(metin)); }
@@ -1351,15 +1360,7 @@ markdown kod bloğu ekleme. Örnek:
 
   if (ilerlemeFn) ilerlemeFn('Okunuyor...');
 
-  const metin = veri.content && veri.content[0] && veri.content[0].text;
-  if (!metin) {
-    throw new Error('Beklenmeyen yanıt formatı (content.text yok) — ham yanıt: ' +
-      JSON.stringify(veri).slice(0, 300));
-  }
-  if (veri.stop_reason === 'max_tokens') {
-    throw new Error('Yanıt yarıda kesildi (max_tokens sınırına takıldı) — ham metin: ' +
-      metin.slice(0, 300));
-  }
+  const metin = yanitMetni(veri);
 
   let sonuc;
   try { sonuc = JSON.parse(diziAyikla(metin)); }
@@ -1916,7 +1917,8 @@ document.getElementById('aTestEt').onclick = async () => {
     const oncekiAnahtar = API_ANAHTARI;
     API_ANAHTARI = apiAnahtari;
     try {
-      await anthropicIstek({ model: AI_MODEL, max_tokens: 8, messages: [{ role: 'user', content: 'merhaba' }] });
+      const testVerisi = await anthropicIstek({ model: AI_MODEL, max_tokens: 8, messages: [{ role: 'user', content: 'merhaba' }] });
+      yanitMetni(testVerisi);
       satirlar.push(testSatiri(true, 'Anthropic API', 'Bağlantı başarılı'));
     } catch (h) {
       satirlar.push(testSatiri(false, 'Anthropic API', h.message || 'bilinmeyen hata'));
