@@ -1,5 +1,5 @@
 /* Wortkasten service worker — kabuk cache-first, kelime listesi network-first */
-const SURUM = 'wortkasten-v11';
+const SURUM = 'wortkasten-v12';
 const KABUK = ['./', './index.html', './manifest.json',
                './icon-180.png', './icon-192.png', './icon-512.png'];
 
