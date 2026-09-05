@@ -94,8 +94,10 @@ kaldırma.
 
 ## Değişiklik sonrası kontrol listesi
 
-1. `index.html` veya `sw.js` değiştiyse `sw.js` içindeki `SURUM`
-   sabitini artır (`wortkasten-v1` → `wortkasten-v2`). Yoksa
+1. `index.html` veya `sw.js` değiştiyse `sw.js` içindeki `SURUM` sabitini
+   **ve** `index.html` başındaki `SURUM` sabitini birlikte, aynı değere
+   artır (`wortkasten-v1` → `wortkasten-v2`). İkisi eşleşmezse Ayarlar
+   ekranındaki sürüm yazısı yanlış değer gösterir. Sürümü artırmazsan
    kullanıcının telefonu eski sürümü cache'ten servis etmeye devam eder.
 2. Yerel test: klasörde `python3 -m http.server`, sonra `localhost:8000`.
    `file://` ile açma — `kelimeler.json` yüklenmez.

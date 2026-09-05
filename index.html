@@ -399,6 +399,7 @@ button:disabled{opacity:.55;cursor:default}
     <div class="ayirac"></div>
     <button class="ikincil" id="aTestEt">Bağlantıyı test et</button>
     <div id="aTestSonuc" style="display:flex;flex-direction:column;gap:8px"></div>
+    <p style="text-align:center;font-size:.72rem;color:var(--sonuk);opacity:.6" id="aSurum"></p>
   </div>
 </div>
 
@@ -430,6 +431,9 @@ const AI_CUMLE_MAX_TOKENS = 300;    // cumle onerisi — tek cumle + ceviri
 const AI_GORSEL_MAX_TOKENS = 8000;  // fotograftan kelime cikarma — sayfa basina 15-20 kelime, her biri cumlesiyle
 const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
+
+// sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
+const SURUM = 'wortkasten-v16';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -2047,9 +2051,22 @@ async function baslat() {
   kuyrukKur();
   ciz();
   mYedekAltGuncelle();
+  document.getElementById('aSurum').textContent = SURUM;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(kayit => {
+      kayit.addEventListener('updatefound', () => {
+        const yeni = kayit.installing;
+        if (!yeni) return;
+        yeni.addEventListener('statechange', () => {
+          // controller varken kurulan yeni surum bir guncelleme demek —
+          // ilk kurulumda controller henuz yok, o zaman bildirim gerekmez
+          if (yeni.state === 'installed' && navigator.serviceWorker.controller) {
+            bildir('Yeni sürüm hazır — uygulamayı kapatıp tekrar aç');
+          }
+        });
+      });
+    }).catch(() => {});
   }
 }
 baslat();
