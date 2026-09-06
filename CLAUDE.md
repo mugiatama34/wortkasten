@@ -88,6 +88,18 @@ aracı — artikeli kelimeyle birlikte görsel olarak ezberletiyor. Görünüm
 çizimini (`kartCiz`, `arkaTrDe`, ilgili CSS) değiştirirken bu bandın
 aynı sınıflarla üretilmeye devam ettiğini doğrula.
 
+**Cümle kartında yazarak cevap modu.** Ayarlar'daki `AYAR.cumleYazarak`
+(varsayılan kapalı) açıkken, sadece `cumle` yönündeki kartlarda boşluk
+yerine bir metin girişi çıkar (`yaziGirisCiz()`); Almanca → Türkçe ve
+Türkçe → Almanca kartlarını etkilemez. Gönderilen cevap
+`karsilastirmaBicimi()` ile normalize edilip (küçük harf, `ä→ae`
+`ö→oe` `ü→ue` `ß→ss`) kütüphanesiz `levenshtein()` fonksiyonuyla
+karşılaştırılır — mesafe 0 tam doğru (dört puanlama düğmesi de çıkar),
+mesafe 1 "neredeyse doğru" (otomatik "Zor"), fazlası "yanlış" (otomatik
+"Tekrar"). Sonuç `yaziliSonuc` değişkeninde tutulur, `ciz()` yeni kartta
+sıfırlar. Otomatik puanlanan durumlarda puanlama düğmeleri yerine tek bir
+"Devam" düğmesi çıkar — bu ikisini karıştırma.
+
 ## Tekrar algoritması
 
 `planla(durum, puan, simdi)` fonksiyonu tek giriş noktası. Öğrenme
