@@ -508,6 +508,14 @@
       "tr": "Sizli bizli olmak",
       "cumle": "Wir kennen uns schon lange, aber wir sind immer noch {{per Sie}}",
       "cumle_tr": ""
+    },
+    {
+      "id": "umtpjx4il0",
+      "tur": "diger",
+      "de": "Jemanden mit Sie ansprechen",
+      "tr": "Biriyle sizli konusmak",
+      "cumle": "Bei uns ist es ganz kormal, dass sich alle mit Sie {{ansprechen}}",
+      "cumle_tr": ""
     }
   ]
 }
