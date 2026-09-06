@@ -500,6 +500,14 @@
       "tr": "Du diye hitap etmeyi teklif etmek",
       "cumle": "Ich finde es kicht schlimm, wenn der küngere Kollege dem älteren das Du {{anbietet}}",
       "cumle_tr": "Birbirimizi iyi tanıyoruz, istersen sana du diye hitap etmeyi teklif edeyim mi?"
+    },
+    {
+      "id": "umtpjvq8h0",
+      "tur": "diger",
+      "de": "per Sie sein",
+      "tr": "Sizli bizli olmak",
+      "cumle": "Wir kennen uns schon lange, aber wir sind immer noch {{per Sie}}",
+      "cumle_tr": ""
     }
   ]
 }
