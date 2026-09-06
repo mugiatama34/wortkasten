@@ -492,6 +492,14 @@
       "tr": "Birine du demek",
       "cumle": "Ich würde eine neue Kollegin oder einen neuen Kollegen niemals ungefragt {{duzen}}",
       "cumle_tr": ""
+    },
+    {
+      "id": "umtpjumii0",
+      "tur": "diger",
+      "de": "jemandem das Du anbieten",
+      "tr": "Du diye hitap etmeyi teklif etmek",
+      "cumle": "Ich finde es kicht schlimm, wenn der küngere Kollege dem älteren das Du {{anbietet}}",
+      "cumle_tr": "Birbirimizi iyi tanıyoruz, istersen sana du diye hitap etmeyi teklif edeyim mi?"
     }
   ]
 }
