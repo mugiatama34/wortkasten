@@ -80,6 +80,14 @@ tüm öğrenme geçmişi sıfırlanır. Aynı sebeple kart yön adları
 Yeni kod eklerken bu sıraya uy. Değişken ve fonksiyon adları Türkçe,
 İngilizceye çevirme.
 
+**Artikel renk bandı kalıcı bir özelliktir.** Türkçe → Almanca kartının
+cevap yüzünde isimler `der` mavi, `die` kırmızı, `das` yeşil renkli
+bir bantla (`.artikel-bant` + `.a-der`/`.a-die`/`.a-das`, `arkaTrDe()`
+içinde üretiliyor) gösterilir. Bu, uygulamanın en önemli öğretme
+aracı — artikeli kelimeyle birlikte görsel olarak ezberletiyor. Görünüm
+çizimini (`kartCiz`, `arkaTrDe`, ilgili CSS) değiştirirken bu bandın
+aynı sınıflarla üretilmeye devam ettiğini doğrula.
+
 ## Tekrar algoritması
 
 `planla(durum, puan, simdi)` fonksiyonu tek giriş noktası. Öğrenme
