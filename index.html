@@ -52,6 +52,14 @@ header{
 .s-yeni b{color:var(--der)} .s-ogr b{color:var(--uyari)} .s-tek b{color:var(--das)}
 .menu-btn{padding:6px 10px;border-radius:9px;background:var(--yuzey2);font-size:1.1rem;line-height:1}
 
+/* ---------- grup cubugu ---------- */
+.grup-cubugu{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 16px;background:var(--yuzey2);border-bottom:1px solid var(--cizgi);
+  font-size:.85rem;flex:0 0 auto;
+}
+.grup-cubugu button{color:var(--der);font-weight:600;font-size:.85rem}
+
 /* ---------- kart alani ---------- */
 main{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;padding:18px 16px}
 .kart{
@@ -225,6 +233,11 @@ button:disabled{opacity:.55;cursor:default}
   <button class="menu-btn" id="menuAc" aria-label="Menü">☰</button>
 </header>
 
+<div class="grup-cubugu gizli" id="grupCubugu">
+  <span id="grupCubuguMetni"></span>
+  <button id="grupCikis">Tümüne dön</button>
+</div>
+
 <main id="ana"></main>
 <footer id="alt"></footer>
 
@@ -236,6 +249,7 @@ button:disabled{opacity:.55;cursor:default}
       <button id="mEkle">Kelime ekle<small>Yeni kelimeyi bu cihaza kaydeder</small></button>
       <button id="mFoto">Fotoğraftan ekle<small>Kamera veya galeriden Almanca kelime çıkar</small></button>
       <button id="mListe">Kelimeler<small>Tüm kelimeleri gör, düzenle</small></button>
+      <button id="mGrupCalis">Gruba göre çalış<small>Sadece seçili grubun kartlarını kuyruğa al</small></button>
       <button id="mIst">İstatistik<small>Kart sayıları ve ilerleme durumu</small></button>
       <button id="mYedek">Yedekle ve aktar<small id="mYedekAlt">Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
       <button id="mAyar">Ayarlar<small>Günlük yeni kelime sınırı</small></button>
@@ -251,8 +265,23 @@ button:disabled{opacity:.55;cursor:default}
 <div class="panel" id="pListe">
   <div class="panel-bas"><h2>Kelimeler</h2><button data-kapat="pListe">Kapat</button></div>
   <div class="panel-icerik">
-    <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
+    <div class="satir-flex">
+      <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
+      <select id="lGrupFiltre" style="width:auto;flex:0 0 auto"></select>
+    </div>
     <div id="listeSonuc" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ==================== GRUBA GÖRE ÇALIŞ ==================== -->
+<div class="panel" id="pGrupCalis">
+  <div class="panel-bas"><h2>Gruba göre çalış</h2><button data-kapat="pGrupCalis">Kapat</button></div>
+  <div class="panel-icerik">
+    <p class="yardim">
+      Bir grup seç, sadece o grubun kartları kuyruğa girsin. Vakti gelmemiş
+      kartlar öne çekilmez — sadece hangi kartların çalışılacağı değişir.
+    </p>
+    <div id="grupCalisListe" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
 
@@ -295,6 +324,11 @@ button:disabled{opacity:.55;cursor:default}
       <input id="fTr" autocomplete="off" placeholder="yaklaşım, girişim">
     </label>
 
+    <label>Grup <span style="opacity:.7">— isteğe bağlı, örn. ünite adı</span>
+      <input id="fGrup" list="grupOneriler" autocomplete="off" placeholder="Ünite 3">
+    </label>
+    <datalist id="grupOneriler"></datalist>
+
     <label>Örnek cümle <span style="opacity:.7">— isteğe bağlı</span>
       <textarea id="fCumle" placeholder="Der neue {{Ansatz}} funktioniert gut."></textarea>
     </label>
@@ -329,6 +363,13 @@ button:disabled{opacity:.55;cursor:default}
     </p>
     <input type="file" id="fotoDosya" accept="image/*" capture="environment" class="gizli">
     <button type="button" class="birincil" id="fotoSec">Fotoğraf seç</button>
+    <div id="fotoGrupSor" class="gizli" style="display:flex;flex-direction:column;gap:10px">
+      <label>Grup <span style="opacity:.7">— isteğe bağlı, örn. ünite adı</span>
+        <input id="fotoGrupGiris" list="grupOnerilerFoto" autocomplete="off" placeholder="Ünite 3">
+      </label>
+      <datalist id="grupOnerilerFoto"></datalist>
+      <button type="button" class="birincil" id="fotoGrupDevam">Devam</button>
+    </div>
     <div id="fotoDurum"></div>
     <div id="fotoSonuc" style="display:flex;flex-direction:column;gap:10px"></div>
     <button type="button" class="birincil gizli" id="fotoEkleBtn">Seçilenleri ekle</button>
@@ -449,7 +490,7 @@ const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v17';
+const SURUM = 'wortkasten-v18';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -467,6 +508,13 @@ let sonGeriAl = null;  // son puanlamayi geri almak icin — sadece bir adim
 let yaziliSonuc = null;  // cumle kartinda yazarak cevap modu: son degerlendirme sonucu
 let duzenlenenId = null;  // kelime ekleme formu duzenleme modundaysa duzenlenen kelimenin id'si
 let fotoAdaylar = [];  // fotograftan cikarilan, onay bekleyen kelime adaylari
+let fotoSeciliDosya = null;  // grup sorulurken bekleyen fotograf dosyasi
+let fotoPartiGrubu = '';     // o fotograf partisindeki tum kelimelere uygulanacak grup
+
+// calisma kuyrugunu belli bir gruba daraltir. null: tum kelimeler,
+// '': grubu olmayan kelimeler, aksi halde grup adi. Kalici degil,
+// sayfa her acildiginda null'a doner — bkz. CLAUDE.md "Kelime gruplari".
+let GRUP_FILTRESI = null;
 
 /* ==========================================================
    Depolama
@@ -562,6 +610,43 @@ function sureMetni(ms) {
 }
 
 /* ==========================================================
+   Kelime gruplari (uniteler)
+   ========================================================== */
+// grup adi -> o gruptaki kelime sayisi (sadece grubu olanlar); grupsuz sayisi ayri
+function grupSayilari() {
+  const sayilar = new Map();
+  let grupsuz = 0;
+  for (const k of KELIMELER) {
+    const g = (k.grup || '').trim();
+    if (!g) { grupsuz++; continue; }
+    sayilar.set(g, (sayilar.get(g) || 0) + 1);
+  }
+  return { sayilar, grupsuz };
+}
+
+// bir kartin gecerli grup filtresine uyup uymadigini kontrol eder
+function kartGrupUyumluMu(kart) {
+  if (GRUP_FILTRESI === null) return true;
+  return (kart.k.grup || '').trim() === GRUP_FILTRESI;
+}
+
+// datalist'i mevcut grup adlariyla doldurur — kelime ekleme ve fotograf formlarinda kullanilir
+function grupOnerileriDoldur(datalistId) {
+  const { sayilar } = grupSayilari();
+  const gruplar = [...sayilar.keys()].sort((a, b) => a.localeCompare(b, 'tr'));
+  document.getElementById(datalistId).innerHTML =
+    gruplar.map(g => `<option value="${kac(g)}">`).join('');
+}
+
+function grupCubuguGuncelle() {
+  const el = document.getElementById('grupCubugu');
+  if (GRUP_FILTRESI === null) { el.classList.add('gizli'); return; }
+  el.classList.remove('gizli');
+  document.getElementById('grupCubuguMetni').textContent =
+    'Grup: ' + (GRUP_FILTRESI === '' ? 'Grupsuz' : GRUP_FILTRESI);
+}
+
+/* ==========================================================
    Kuyruk
    ========================================================== */
 function kuyrukKur() {
@@ -570,7 +655,7 @@ function kuyrukKur() {
 
   if (AYAR.gun !== gun) { AYAR.gun = gun; AYAR.yeniSayac = 0; yaz(K_AYAR, AYAR); }
 
-  const hepsi = kartlar();
+  const hepsi = kartlar().filter(kartGrupUyumluMu);
   const ogrenme = [], tekrar = [], yeni = [];
 
   for (const kart of hepsi) {
@@ -584,16 +669,27 @@ function kuyrukKur() {
   karistir(tekrar);
 
   // gunun yeni kelimeleri: hic gorulmemis kelimeler arasindan rastgele
-  // secilir; secim gun boyunca sabit kalir, sayfa yenilense de degismez
-  let secim = oku(K_YENISECIM, null);
-  if (!secim || secim.gun !== gun) {
-    const kelimeIdleri = karistir([...new Set(yeni.map(kart => kart.k.id))]);
-    const idler = AYAR.yeniLimit === null ? kelimeIdleri : kelimeIdleri.slice(0, AYAR.yeniLimit);
-    secim = { gun, idler };
-    yaz(K_YENISECIM, secim);
+  // secilir; secim gun boyunca sabit kalir, sayfa yenilense de degismez.
+  // Grup filtresi aktifken bu gunluk kotaya hic bakilmaz — o gruptaki tum
+  // yeni kelimeler dogrudan kuyruga girer. Aksi halde iki sorun cikardi:
+  // (1) kotanin genel kelime havuzundan degil sadece o grubun kelimelerinden
+  // secilmis gibi gunun geri kalaninda kalici olarak daralmasi, (2) az once
+  // eklenen yeni kelimelerin gunun kotasi zaten belirlenmisse hic gorunmemesi
+  // — ki "gruba göre çalış" tam olarak bunun icin var.
+  let secilenYeni;
+  if (GRUP_FILTRESI !== null) {
+    secilenYeni = yeni;
+  } else {
+    let secim = oku(K_YENISECIM, null);
+    if (!secim || secim.gun !== gun) {
+      const kelimeIdleri = karistir([...new Set(yeni.map(kart => kart.k.id))]);
+      const idler = AYAR.yeniLimit === null ? kelimeIdleri : kelimeIdleri.slice(0, AYAR.yeniLimit);
+      secim = { gun, idler };
+      yaz(K_YENISECIM, secim);
+    }
+    const secilenKelimeler = new Set(secim.idler);
+    secilenYeni = yeni.filter(kart => secilenKelimeler.has(kart.k.id));
   }
-  const secilenKelimeler = new Set(secim.idler);
-  const secilenYeni = yeni.filter(kart => secilenKelimeler.has(kart.k.id));
 
   // yeni kartlari tekrarlarin arasina dagit ki tek blok halinde gelmesin
   kuyruk = ogrenme.concat(harmanla(tekrar, secilenYeni));
@@ -614,6 +710,7 @@ function sayaclariGuncelle() {
   }
   // kuyrukta olmayip vakti gelmis kartlar (ornegin gun icinde olgunlasanlar)
   for (const kart of kartlar()) {
+    if (!kartGrupUyumluMu(kart)) continue;
     if (kuyruktaki.has(kart.id)) continue;
     const d = ILERLEME[kart.id];
     if (!d || d.sonraki > simdi) continue;
@@ -939,7 +1036,7 @@ function geriAl() {
 }
 
 function bosEkran() {
-  const toplam = kartlar().length;
+  const toplam = kartlar().filter(kartGrupUyumluMu).length;
   if (!toplam) {
     ana.innerHTML = `<div class="durum">
       <h2>Henüz kelime yok</h2>
@@ -949,9 +1046,16 @@ function bosEkran() {
     document.getElementById('bosEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
   } else {
     const sonraki = enYakinTarih();
+    let mesaj = sonraki ? 'Sıradaki tekrar: ' + sonraki : 'Bekleyen kart yok.';
+    if (GRUP_FILTRESI !== null) {
+      const grupAdi = GRUP_FILTRESI === '' ? 'Grupsuz' : GRUP_FILTRESI;
+      mesaj = sonraki
+        ? '"' + grupAdi + '" grubunda vakti gelmiş kart yok. Sıradaki tekrar: ' + sonraki
+        : '"' + grupAdi + '" grubunda bekleyen kart yok.';
+    }
     ana.innerHTML = `<div class="durum">
       <h2>Bugünlük bitti</h2>
-      <p>${sonraki ? 'Sıradaki tekrar: ' + sonraki : 'Bekleyen kart yok.'}</p>
+      <p>${kac(mesaj)}</p>
       <button id="bosEkle">Kelime ekle</button></div>`;
     document.getElementById('bosEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
   }
@@ -959,10 +1063,17 @@ function bosEkran() {
   geriAlBagla();
 }
 
+// grup filtresi aktifse sadece o gruba ait kart id'lerini dikkate alir —
+// vakti gelmemis kartlari onceye cekmez, sadece hangi id'lerin sayildigini daraltir
 function enYakinTarih() {
   const simdi = Date.now();
+  const izinVerilen = GRUP_FILTRESI === null ? null :
+    new Set(kartlar().filter(kartGrupUyumluMu).map(kart => kart.id));
   let en = Infinity;
-  for (const id in ILERLEME) { const s = ILERLEME[id].sonraki; if (s > simdi && s < en) en = s; }
+  for (const id in ILERLEME) {
+    if (izinVerilen && !izinVerilen.has(id)) continue;
+    const s = ILERLEME[id].sonraki; if (s > simdi && s < en) en = s;
+  }
   if (en === Infinity) return '';
   const d = new Date(en);
   const fark = en - simdi;
@@ -985,8 +1096,51 @@ document.querySelector('#pEkle [data-kapat]').onclick = () => { panelKapat(); fo
 document.getElementById('menuAc').onclick = () => panelAc('pMenu');
 document.getElementById('mEkle').onclick = () => { formuTemizle(); panelAc('pEkle'); };
 document.getElementById('mListe').onclick = () => { listeCiz(); panelAc('pListe'); };
+document.getElementById('mGrupCalis').onclick = () => { grupCalisListesiCiz(); panelAc('pGrupCalis'); };
 document.getElementById('mIst').onclick  = () => { istCiz(); panelAc('pIst'); };
 document.getElementById('mYedek').onclick = () => panelAc('pYedek');
+
+// gruba gore calisma paneli: her grubu ve grupsuz kelimeleri, kac kelime
+// icerdikleriyle listeler; secim GRUP_FILTRESI'ni degistirir ve kuyrugu yeniden kurar
+function grupCalisListesiCiz() {
+  const { sayilar, grupsuz } = grupSayilari();
+  const gruplar = [...sayilar.keys()].sort((a, b) => a.localeCompare(b, 'tr'));
+  const el = document.getElementById('grupCalisListe');
+
+  let h = `<button class="liste-satir" data-grup="">
+      <div class="liste-bas">Tüm kelimeler</div>
+      <div class="liste-alt">${KELIMELER.length} kelime</div>
+    </button>`;
+  for (const g of gruplar) {
+    h += `<button class="liste-satir" data-grup="${kac(g)}">
+      <div class="liste-bas">${kac(g)}</div>
+      <div class="liste-alt">${sayilar.get(g)} kelime</div>
+    </button>`;
+  }
+  h += `<button class="liste-satir" data-grup="__grupsuz__">
+      <div class="liste-bas">Grupsuz</div>
+      <div class="liste-alt">${grupsuz} kelime</div>
+    </button>`;
+  el.innerHTML = h;
+
+  el.querySelectorAll('[data-grup]').forEach(b => {
+    b.onclick = () => {
+      const g = b.dataset.grup;
+      GRUP_FILTRESI = g === '' ? null : (g === '__grupsuz__' ? '' : g);
+      panelKapat();
+      kuyrukKur();
+      ciz();
+      grupCubuguGuncelle();
+    };
+  });
+}
+
+document.getElementById('grupCikis').onclick = () => {
+  GRUP_FILTRESI = null;
+  kuyrukKur();
+  ciz();
+  grupCubuguGuncelle();
+};
 
 function mYedekAltGuncelle() {
   const el = document.getElementById('mYedekAlt');
@@ -1066,17 +1220,20 @@ function formuDoldur(k) {
   document.getElementById('fCogul').value = k.cogul || '';
   document.getElementById('fFormlar').value = k.formlar || '';
   document.getElementById('fTr').value = k.tr || '';
+  document.getElementById('fGrup').value = k.grup || '';
   document.getElementById('fCumle').value = k.cumle || '';
   document.getElementById('fCumleTr').value = k.cumle_tr || '';
+  grupOnerileriDoldur('grupOneriler');
   ekleModuGuncelle();
 }
 
 // formu bosaltir, ekleme moduna doner
 function formuTemizle() {
-  ['fDe', 'fTr', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
+  ['fDe', 'fTr', 'fGrup', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
     document.getElementById(i).value = '';
   });
   duzenlenenId = null;
+  grupOnerileriDoldur('grupOneriler');
   ekleModuGuncelle();
 }
 
@@ -1094,6 +1251,8 @@ function formdanKelimeOku() {
     govde.cogul = document.getElementById('fCogul').value.trim();
   }
   if (tur === 'fiil') govde.formlar = document.getElementById('fFormlar').value.trim();
+  const grup = document.getElementById('fGrup').value.trim();
+  if (grup) govde.grup = grup;
   return govde;
 }
 
@@ -1618,15 +1777,21 @@ function fotoSonucCiz() {
 
 function fotoPaneliSifirla() {
   fotoAdaylar = [];
+  fotoSeciliDosya = null;
+  fotoPartiGrubu = '';
   fotoDurumGoster('');
   fotoSonucCiz();
   document.getElementById('fotoSec').disabled = false;
+  document.getElementById('fotoSec').classList.remove('gizli');
+  document.getElementById('fotoGrupSor').classList.add('gizli');
 }
 
 document.getElementById('mFoto').onclick = () => { fotoPaneliSifirla(); panelAc('pFoto'); };
 document.getElementById('fotoSec').onclick = () => document.getElementById('fotoDosya').click();
 
-document.getElementById('fotoDosya').onchange = async (e) => {
+// dosya secildikten hemen sonra islenmez — once grup sorulur (bkz. CLAUDE.md
+// "Fotoğraftan kelime çıkarma"); "Devam" ile fotoIslemeBasla() cagrilir
+document.getElementById('fotoDosya').onchange = (e) => {
   const dosya = e.target.files[0];
   e.target.value = '';  // ayni dosyayi tekrar secebilmek icin
   if (!dosya) return;
@@ -1635,6 +1800,21 @@ document.getElementById('fotoDosya').onchange = async (e) => {
     fotoDurumGoster('Önce Ayarlar\'dan Anthropic API anahtarını gir', true);
     return;
   }
+
+  fotoSeciliDosya = dosya;
+  grupOnerileriDoldur('grupOnerilerFoto');
+  document.getElementById('fotoGrupGiris').value = '';
+  document.getElementById('fotoSec').classList.add('gizli');
+  document.getElementById('fotoGrupSor').classList.remove('gizli');
+  document.getElementById('fotoGrupGiris').focus();
+};
+
+async function fotoIslemeBasla() {
+  const dosya = fotoSeciliDosya;
+  if (!dosya) return;
+  fotoPartiGrubu = document.getElementById('fotoGrupGiris').value.trim();
+  document.getElementById('fotoGrupSor').classList.add('gizli');
+  document.getElementById('fotoSec').classList.remove('gizli');
 
   fotoAdaylar = [];
   fotoSonucCiz();
@@ -1650,6 +1830,7 @@ document.getElementById('fotoDosya').onchange = async (e) => {
     fotoAdaylar = sonuc.liste;
     fotoDurumGoster(
       fotoAdaylar.length + ' kelime bulundu' +
+      (fotoPartiGrubu ? ' — grup: ' + fotoPartiGrubu : '') +
       (sonuc.kesikMi ? ' — sayfanın tamamı işlenemedi, kalanlar için tekrar deneyin' : ''),
       sonuc.kesikMi
     );
@@ -1658,8 +1839,14 @@ document.getElementById('fotoDosya').onchange = async (e) => {
     fotoDurumGoster(h.message || 'Fotoğraf işlenemedi — daha net bir fotoğraf çekmeyi dene', true);
   } finally {
     secBtn.disabled = false;
+    fotoSeciliDosya = null;
   }
-};
+}
+
+document.getElementById('fotoGrupDevam').onclick = fotoIslemeBasla;
+document.getElementById('fotoGrupGiris').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); fotoIslemeBasla(); }
+});
 
 document.getElementById('fotoEkleBtn').onclick = () => {
   const govdeler = [];
@@ -1682,6 +1869,7 @@ document.getElementById('fotoEkleBtn').onclick = () => {
       govde.cogul = document.getElementById(`fo-cogul-${i}`).value.trim();
     }
     if (tur === 'fiil') govde.formlar = document.getElementById(`fo-formlar-${i}`).value.trim();
+    if (fotoPartiGrubu) govde.grup = fotoPartiGrubu;
     govdeler.push(govde);
   });
 
@@ -1848,16 +2036,35 @@ function kelimeDurumu(kartIdleri) {
   return enSonAsama === 'tekrar' ? 'tekrar' : 'ogrenme';
 }
 
+// grup filtresi acilir menusunu (Tum gruplar / her grup / Grupsuz) sayilarla doldurur;
+// mevcut secim korunur, secim artik listede yoksa "Tum gruplar"a doner
+function lGrupFiltreDoldur() {
+  const sel = document.getElementById('lGrupFiltre');
+  const secili = sel.value;
+  const { sayilar, grupsuz } = grupSayilari();
+  const gruplar = [...sayilar.keys()].sort((a, b) => a.localeCompare(b, 'tr'));
+
+  let h = `<option value="">Tüm gruplar (${KELIMELER.length})</option>`;
+  for (const g of gruplar) h += `<option value="${kac(g)}">${kac(g)} (${sayilar.get(g)})</option>`;
+  h += `<option value="__grupsuz__">Grupsuz (${grupsuz})</option>`;
+  sel.innerHTML = h;
+  if ([...sel.options].some(o => o.value === secili)) sel.value = secili;
+}
+
 function listeCiz() {
+  lGrupFiltreDoldur();
   const q = document.getElementById('lArama').value.trim().toLocaleLowerCase('tr-TR');
+  const grupSecim = document.getElementById('lGrupFiltre').value;
   const harita = kelimeKartHaritasi();
   const el = document.getElementById('listeSonuc');
 
   const siralanan = KELIMELER.slice().sort((a, b) => a.de.localeCompare(b.de, 'de'));
-  const gosterilecek = q
+  let gosterilecek = q
     ? siralanan.filter(k =>
         k.de.toLocaleLowerCase('tr-TR').includes(q) || k.tr.toLocaleLowerCase('tr-TR').includes(q))
     : siralanan;
+  if (grupSecim === '__grupsuz__') gosterilecek = gosterilecek.filter(k => !(k.grup || '').trim());
+  else if (grupSecim) gosterilecek = gosterilecek.filter(k => (k.grup || '').trim() === grupSecim);
 
   if (!gosterilecek.length) {
     el.innerHTML = `<p class="yardim">Eşleşen kelime yok.</p>`;
@@ -1868,9 +2075,10 @@ function listeCiz() {
     const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
     const kartIdleri = harita.get(k.id) || [];
     const durum = kelimeDurumu(kartIdleri);
+    const grupMetni = k.grup ? ' · ' + kac(k.grup) : '';
     return `<button class="liste-satir" data-id="${kac(k.id)}">
       <div class="liste-bas">${kac(bas)}</div>
-      <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}</div>
+      <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}</div>
     </button>`;
   }).join('');
 
@@ -1884,6 +2092,7 @@ function listeCiz() {
   });
 }
 document.getElementById('lArama').oninput = listeCiz;
+document.getElementById('lGrupFiltre').onchange = listeCiz;
 
 /* ---------- istatistik ---------- */
 
