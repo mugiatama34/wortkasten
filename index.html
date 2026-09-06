@@ -226,9 +226,22 @@ button:disabled{opacity:.55;cursor:default}
   font-size:1.05rem;line-height:1.5;
 }
 .oyun-tokenler{display:flex;flex-wrap:wrap;gap:8px}
-.oyun-token{padding:10px 14px;border-radius:10px;background:var(--yuzey2);border:1px solid var(--cizgi);font-size:1rem}
+.oyun-token{display:inline-block;margin:2px 1px;padding:10px 14px;border-radius:10px;background:var(--yuzey2);border:1px solid var(--cizgi);font-size:1rem}
+.oyun-token.secili{background:var(--der);color:#fff;border-color:var(--der)}
+.oyun-token-dogru{background:var(--iyi);color:#fff;border-color:var(--iyi)}
+.oyun-token-kacirilan{background:none;border:1px dashed var(--die);color:var(--die)}
+.oyun-token-yanlis-isaret{background:var(--die);color:#fff;border-color:var(--die)}
 .oyun-fark{color:var(--die);font-weight:700;text-decoration:underline;text-decoration-style:wavy}
 .oyun-cumle-tr{font-size:.9rem;color:var(--sonuk);margin-top:6px}
+.oyun-metin{font-size:1.02rem;line-height:2.1}
+.oyun-bosluk-giris{
+  width:6.5em;padding:2px 6px;margin:0 2px;border:none;border-bottom:2px solid var(--der);
+  background:transparent;color:inherit;font:inherit;text-align:center;
+}
+.oyun-bosluk-dogru{color:var(--iyi);font-weight:600}
+.oyun-bosluk-yakin{color:var(--uyari);font-weight:600}
+.oyun-bosluk-yanlis{color:var(--die);font-weight:600;text-decoration:line-through}
+.oyun-bosluk-dogrusu{color:var(--sonuk);font-size:.85em}
 .geri-al-btn{
   display:block;width:100%;padding:8px;margin-bottom:8px;
   font-size:.82rem;color:var(--sonuk);text-align:center;
@@ -335,6 +348,7 @@ button:disabled{opacity:.55;cursor:default}
 <div class="panel" id="pOyunKapsam">
   <div class="panel-bas"><h2 id="oyunKapsamBaslik">Kapsam seç</h2><button data-kapat="pOyunKapsam">Kapat</button></div>
   <div class="panel-icerik">
+    <p class="yardim gizli" id="oyunKapsamMaliyet">Bu oyun her oynayışta bir API çağrısı yapıyor, küçük bir maliyete yol açar.</p>
     <div id="oyunKapsamListe" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
@@ -546,11 +560,13 @@ const AI_MODEL = 'claude-haiku-4-5-20251001';
 const AI_GORSEL_MODEL = 'claude-sonnet-5';
 const AI_CUMLE_MAX_TOKENS = 300;    // cumle onerisi — tek cumle + ceviri
 const AI_GORSEL_MAX_TOKENS = 8000;  // fotograftan kelime cikarma — sayfa basina 15-20 kelime, her biri cumlesiyle
+const AI_BOSLUK_MAX_TOKENS = 1200;  // oyun: bosluk doldurma — 5-8 cumlelik metin + cevap dizisi
+const AI_AVCI_MAX_TOKENS = 1200;    // oyun: hatali kelime avi — 6-8 cumlelik metin + hata aciklamalari
 const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v21';
+const SURUM = 'wortkasten-v22';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -1220,21 +1236,42 @@ const OYUNLAR = {
     minKelime: 5,
     gerekMetni: 'Bu oyun için en az 5 örnek cümleli kelime gerekiyor.',
     uygunKelimeler: (liste) => liste.filter(k => k.cumle && k.cumle.includes('{{'))
+  },
+  bosluk: {
+    ad: 'Boşluk Doldurma',
+    aciklama: 'Yapay zekânın ürettiği metindeki boşlukları kelimenin doğru çekimli hâliyle doldur.',
+    minKelime: 8,
+    gerekMetni: 'Bu oyun için en az 8 kelime gerekiyor.',
+    apiGerekli: true,
+    uygunKelimeler: (liste) => liste
+  },
+  avci: {
+    ad: 'Hatalı Kelime Avı',
+    aciklama: 'Yapay zekânın ürettiği metinde yanlış anlamda kullanılmış kelimeleri bul.',
+    minKelime: 6,
+    gerekMetni: 'Bu oyun için en az 6 kelime gerekiyor.',
+    apiGerekli: true,
+    uygunKelimeler: (liste) => liste
   }
 };
 
 let OYUN_SECILI = null;   // secili oyunun id'si — kapsam secilirken kullanilir
 let oyunZamanlayici = null;  // artikel turundaki geri bildirim duraklamasi
+let OYUN_ISTEK_NO = 0;  // bosluk/avci oyunlarinin API istegini iptal etmek icin — panel kapatilinca artar
 let OA = null;  // artikel turu calisma zamani durumu
 let OC = null;  // cumle dizme calisma zamani durumu
+let OB = null;  // bosluk doldurma calisma zamani durumu
+let OH = null;  // hatali kelime avi calisma zamani durumu
 
 function oyunListesiCiz() {
   const el = document.getElementById('oyunListeIcerik');
   el.innerHTML = Object.keys(OYUNLAR).map(id => {
     const o = OYUNLAR[id];
-    return `<button class="liste-satir" data-oyun="${id}">
+    const pasif = o.apiGerekli && !API_ANAHTARI;
+    const alt = pasif ? 'API anahtarı gerekiyor — Ayarlar\'dan ekleyebilirsin' : o.aciklama;
+    return `<button class="liste-satir" data-oyun="${id}"${pasif ? ' disabled' : ''}>
       <div class="liste-bas">${kac(o.ad)}</div>
-      <div class="liste-alt">${kac(o.aciklama)}</div>
+      <div class="liste-alt">${kac(alt)}</div>
     </button>`;
   }).join('');
   el.querySelectorAll('[data-oyun]').forEach(b => {
@@ -1254,6 +1291,7 @@ function oyunKapsamdakiKelimeler(kapsam) {
 function oyunKapsamListesiCiz() {
   const tanim = OYUNLAR[OYUN_SECILI];
   document.getElementById('oyunKapsamBaslik').textContent = tanim.ad + ' — kapsam';
+  document.getElementById('oyunKapsamMaliyet').classList.toggle('gizli', !tanim.apiGerekli);
   const { sayilar, grupsuz } = grupSayilari();
   const gruplar = [...sayilar.keys()].sort((a, b) => a.localeCompare(b, 'tr'));
   const el = document.getElementById('oyunKapsamListe');
@@ -1287,6 +1325,19 @@ function oyunKapsamListesiCiz() {
 function oyunBaslat(oyunId, kelimeler) {
   if (oyunId === 'artikel') oyunArtikelBaslat(kelimeler);
   else if (oyunId === 'cumle') oyunCumleBaslat(kelimeler);
+  else if (oyunId === 'bosluk') oyunBoslukBaslat(kelimeler);
+  else if (oyunId === 'avci') oyunAvciBaslat(kelimeler);
+}
+
+// API'den metin isterken hata olursa (ag hatasi, ayristirma hatasi, vb.)
+// gosterilen ekran — tekrar deneme ya da vazgecme secenegi sunar.
+function oyunAiHatasiCiz(mesaj, tekrarFn) {
+  document.getElementById('oyunIcerik').innerHTML = `
+    <p class="yardim">${kac(mesaj)}</p>
+    <button class="birincil" id="oyunTekrarDeneBtn">Tekrar dene</button>
+    <button class="ikincil" id="oyunVazgecBtn">Oyunlara dön</button>`;
+  document.getElementById('oyunTekrarDeneBtn').onclick = tekrarFn;
+  document.getElementById('oyunVazgecBtn').onclick = () => { oyunListesiCiz(); panelAc('pOyunlar'); };
 }
 
 function oyunSureMetni(ms) {
@@ -1295,21 +1346,35 @@ function oyunSureMetni(ms) {
   return Math.floor(saniye / 60) + ' dk ' + (saniye % 60) + ' sn';
 }
 
-// oyun sonu: skor, (varsa) sure, yanlis yapilan kelimelerin duzenlenebilir listesi
-function oyunSonucCiz(baslik, dogru, toplam, sureMs, yanlislar) {
+// oyun sonu: skor, (varsa) sure, (varsa) ekstra istatistik satirlari, ve
+// gozden gecirilecek ogelerin listesi. Liste ogesi gercek bir kelime nesnesi
+// ise (tur alani var) tiklaninca formuDoldur ile duzenlemeye acilir; degilse
+// (Bosluk Doldurma/Hatali Kelime Avi'nin ad/alt tasiyan salt bilgi amacli
+// aciklamalari gibi) sadece goruntulenir.
+function oyunSonucCiz(baslik, dogru, toplam, sureMs, yanlislar, ekstra) {
   document.getElementById('oyunBaslik').textContent = baslik + ' — Sonuç';
   let h = `<div class="ist-satir"><span>Doğru</span><b>${dogru} / ${toplam}</b></div>`;
   if (sureMs !== null) h += `<div class="ist-satir"><span>Süre</span><b>${oyunSureMetni(sureMs)}</b></div>`;
+  for (const e of (ekstra || [])) {
+    h += `<div class="ist-satir"><span>${kac(e.etiket)}</span><b>${kac(String(e.deger))}</b></div>`;
+  }
 
   if (yanlislar.length) {
-    h += `<div class="ist-baslik">Yanlış yapılan kelimeler</div>
+    const baslikMetni = yanlislar[0].tur ? 'Yanlış yapılan kelimeler' : 'Ayrıntılar';
+    h += `<div class="ist-baslik">${kac(baslikMetni)}</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${yanlislar.map((k, i) => {
-          const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
-          return `<button class="liste-satir" data-yanlis-idx="${i}">
-            <div class="liste-bas">${kac(bas)}</div>
-            <div class="liste-alt">${kac(k.tr)}</div>
-          </button>`;
+          if (k.tur) {
+            const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+            return `<button class="liste-satir" data-yanlis-idx="${i}">
+              <div class="liste-bas">${kac(bas)}</div>
+              <div class="liste-alt">${kac(k.tr)}</div>
+            </button>`;
+          }
+          return `<div class="liste-satir">
+            <div class="liste-bas">${kac(k.ad)}</div>
+            <div class="liste-alt">${kac(k.alt)}</div>
+          </div>`;
         }).join('')}
       </div>`;
   } else {
@@ -1474,11 +1539,302 @@ function oyunCumleBitir() {
   oyunSonucCiz('Cümle Dizme', dogru, toplam, null, yanlislar);
 }
 
+/* ---------- Oyun 3: Bosluk Doldurma Metni ---------- */
+// Kapsamdan 8-10 kelime secilip modelden bunlarin HEPSINI, kayitli ornek
+// cumlelerinden FARKLI bir baglamda kullanan bagli bir metin istenir; her
+// kelimenin metindeki yeri, gonderilen kelime listesindeki 1 tabanli
+// numarasiyla {{N}} olarak isaretlenir. "cevaplar" dizisi ayni sirada
+// beklenen cekimli bicimleri tasir. Degerlendirme, cumle kartindaki yazarak
+// cevap moduyla (karsilastirmaBicimi/levenshtein) birebir aynidir.
+function boslukIstemOlustur(kelimeler) {
+  const liste = kelimeler.map((k, i) => {
+    const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+    return (i + 1) + '. ' + bas + ' — ' + k.tr;
+  }).join('\n');
+
+  return `Almanca öğrenen Türkçe konuşan biri için boşluk doldurma metni üret.
+
+Aşağıdaki ${kelimeler.length} kelimenin HER BİRİNİ tam olarak bir kez
+kullanarak, 5-8 cümlelik, birbirine bağlı, B1-B2 seviyesinde doğal bir
+Almanca metin yaz:
+
+${liste}
+
+Kelimeleri, bu listedeki kelimelerin olası kayıtlı örnek cümlelerinden
+FARKLI, yeni bir bağlamda kullan. Kelimeler metin içinde gerektiği gibi
+çekimlenebilir (fiil çekimi, çoğul, hâl eki vb.). Her kelimenin metindeki
+yerini, yukarıdaki numarasıyla, çift süslü parantez içinde işaretle —
+parantezin içine SADECE numarayı yaz, kelimeyi yazma. Örnek:
+"..., deshalb hat sie {{3}} genommen."
+
+Yanıtın SADECE şu JSON formatında olsun, başka hiçbir metin, açıklama ya da
+markdown kod bloğu ekleme:
+{"metin": "... {{1}} ... {{2}} ...", "cevaplar": ["1 numaralı kelimenin metindeki tam çekimli hâli", "2 numaralı kelimenin metindeki tam çekimli hâli", ...]}
+
+"cevaplar" dizisi yukarıdaki numaralandırmayla aynı sırada olsun.`;
+}
+
+async function boslukUret(kelimeler) {
+  const veri = await anthropicIstek({
+    model: AI_MODEL,
+    max_tokens: AI_BOSLUK_MAX_TOKENS,
+    messages: [{ role: 'user', content: boslukIstemOlustur(kelimeler) }]
+  });
+  const metin = yanitMetni(veri);
+
+  let sonuc;
+  try { sonuc = JSON.parse(jsonAyikla(metin)); }
+  catch (h) { throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 200)); }
+  if (!sonuc || typeof sonuc !== 'object') {
+    throw new Error('Yanıt bir JSON nesnesi değil — ham metin: ' + metin.slice(0, 200));
+  }
+  if (typeof sonuc.metin !== 'string' || !sonuc.metin.includes('{{')) {
+    throw new Error('Yanıtta metin alanı eksik ya da boşluk işareti yok — ham metin: ' + metin.slice(0, 200));
+  }
+  if (!Array.isArray(sonuc.cevaplar) || sonuc.cevaplar.length !== kelimeler.length ||
+      !sonuc.cevaplar.every(c => typeof c === 'string' && c.trim())) {
+    throw new Error('Yanıtta cevaplar dizisi eksik ya da kelime sayısıyla uyuşmuyor — ham metin: ' + metin.slice(0, 200));
+  }
+  const bulunanNolar = [...sonuc.metin.matchAll(/\{\{(\d+)\}\}/g)].map(m => parseInt(m[1], 10));
+  const beklenenNolar = kelimeler.map((_, i) => i + 1);
+  const gecerliMi = bulunanNolar.length === beklenenNolar.length &&
+    new Set(bulunanNolar).size === bulunanNolar.length &&
+    beklenenNolar.every(n => bulunanNolar.includes(n));
+  if (!gecerliMi) {
+    throw new Error('Yanıttaki boşluk işaretleri kelime numaralarıyla uyuşmuyor — ham metin: ' + metin.slice(0, 300));
+  }
+
+  return { metin: sonuc.metin, cevaplar: sonuc.cevaplar };
+}
+
+function oyunBoslukBaslat(kelimeler) {
+  const secilen = karistir(kelimeler.slice()).slice(0, Math.min(10, kelimeler.length));
+  const istekNo = ++OYUN_ISTEK_NO;
+  document.getElementById('oyunBaslik').textContent = 'Boşluk Doldurma';
+  panelAc('pOyun');
+  document.getElementById('oyunIcerik').innerHTML = `<p class="yardim">Metin hazırlanıyor...</p>`;
+
+  boslukUret(secilen).then(({ metin, cevaplar }) => {
+    if (istekNo !== OYUN_ISTEK_NO) return;
+    OB = { kelimeler: secilen, metin, cevaplar, bitti: false };
+    oyunBoslukCiz();
+  }).catch(h => {
+    if (istekNo !== OYUN_ISTEK_NO) return;
+    oyunAiHatasiCiz(h.message || 'Metin üretilemedi', () => oyunBoslukBaslat(kelimeler));
+  });
+}
+
+function oyunBoslukTokenlariCiz(metin) {
+  return metin.split(/\{\{(\d+)\}\}/).map((parca, i) =>
+    i % 2 === 1
+      ? `<input type="text" class="oyun-bosluk-giris" data-blank="${parca}" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">`
+      : kac(parca)
+  ).join('');
+}
+
+function oyunBoslukCiz() {
+  document.getElementById('oyunIcerik').innerHTML = `
+    <p class="oyun-metin">${oyunBoslukTokenlariCiz(OB.metin)}</p>
+    <button class="birincil" id="oyunBoslukKontrol">Kontrol et</button>`;
+  document.getElementById('oyunBoslukKontrol').onclick = oyunBoslukKontrolEt;
+}
+
+function oyunBoslukKontrolEt() {
+  if (OB.bitti) return;
+  OB.bitti = true;
+
+  const sonuclar = new Map();  // blank no (1 tabanli, kelime index+1) -> {tur, girilen, dogruCevap}
+  document.querySelectorAll('#oyunIcerik .oyun-bosluk-giris').forEach(giris => {
+    const n = parseInt(giris.dataset.blank, 10);
+    const dogruCevap = OB.cevaplar[n - 1];
+    const girilen = giris.value;
+    const mesafe = levenshtein(karsilastirmaBicimi(girilen), karsilastirmaBicimi(dogruCevap));
+    const tur = mesafe === 0 ? 'dogru' : mesafe === 1 ? 'yakin' : 'yanlis';
+    sonuclar.set(n, { tur, girilen, dogruCevap });
+  });
+
+  const sonucMetni = OB.metin.split(/\{\{(\d+)\}\}/).map((parca, i) => {
+    if (i % 2 === 0) return kac(parca);
+    const s = sonuclar.get(parseInt(parca, 10));
+    if (s.tur === 'dogru') return `<span class="oyun-bosluk-dogru">${kac(s.girilen)}</span>`;
+    const gosterilen = s.girilen.trim() ? kac(s.girilen) : '—';
+    return `<span class="oyun-bosluk-${s.tur}">${gosterilen}</span> <span class="oyun-bosluk-dogrusu">(doğrusu: ${kac(s.dogruCevap)})</span>`;
+  }).join('');
+
+  OB.dogruSayisi = [...sonuclar.values()].filter(s => s.tur === 'dogru').length;
+  OB.yanlislar = OB.kelimeler.filter((_, i) => sonuclar.get(i + 1).tur !== 'dogru');
+
+  document.getElementById('oyunIcerik').innerHTML = `
+    <p class="oyun-metin">${sonucMetni}</p>
+    <div class="ist-satir"><span>Doğru</span><b>${OB.dogruSayisi} / ${OB.kelimeler.length}</b></div>
+    <button class="birincil" id="oyunBoslukBitirBtn">Bitir</button>`;
+  document.getElementById('oyunBoslukBitirBtn').onclick = oyunBoslukBitir;
+}
+
+function oyunBoslukBitir() {
+  const dogru = OB.dogruSayisi, toplam = OB.kelimeler.length, yanlislar = OB.yanlislar;
+  OB = null;
+  oyunSonucCiz('Boşluk Doldurma', dogru, toplam, null, yanlislar);
+}
+
+/* ---------- Oyun 4: Hatali Kelime Avi ---------- */
+// Modelden, kapsamdaki kelimelerden bir kismini kullanan 6-8 cumlelik bir
+// metin istenir; icinde bilinçli olarak 3 kelime yanlis anlamda kullanilir
+// (dilbilgisi dogru, anlam bağlama uymuyor). Yanlis kullanilan kelimeler
+// modelin yanitinda, cumle alanindaki tek-hedef isaretlemesiyle ayni yazimla
+// {{...}} icine alinir — bu isaretler ekranda HIC gosterilmez, sadece hangi
+// token'in gercekte hatali oldugunu bilmemizi saglar. Kullanici metindeki
+// herhangi bir kelimeye dokunarak supheli isaretler, "Kontrol et" ile
+// karsilastirilir: dogru bulunan hata +1, yanlis isaretlenen kelime -1 puan.
+function avciIstemOlustur(kelimeler) {
+  const liste = kelimeler.map(k => {
+    const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+    return bas + ' — ' + k.tr;
+  }).join('\n');
+
+  return `Almanca öğrenen Türkçe konuşan biri için "hatalı kelime avı" metni üret.
+
+Aşağıdaki kelime listesinden seçtiklerini kullanarak 6-8 cümlelik, birbirine
+bağlı, B1-B2 seviyesinde doğal bir Almanca metin yaz:
+
+${liste}
+
+Metindeki kelimelerden TAM OLARAK 3 tanesini bilinçli olarak yanlış anlamda
+kullan: cümlenin dilbilgisi kusursuz olsun, ama o kelimenin anlamı cümledeki
+bağlama uymasın (örnek: bir arabanın bagajından bahsederken "Schrank"
+kullanmak gibi — doğrusu "Kofferraum" olurdu). Bu 3 kelimeyi, metinde
+göründükleri hâliyle çift süslü parantez içine al, örnek: "Ich habe die
+Fahrkarte in den {{Schrank}} gelegt." Diğer hiçbir kelimeye işaret koyma.
+
+Yanıtın SADECE şu JSON formatında olsun, başka hiçbir metin, açıklama ya da
+markdown kod bloğu ekleme:
+{"metin": "... {{yanlış kullanılan kelime}} ...", "hatalar": [{"dogrusu": "bu bağlamda doğru olan kelime", "aciklama": "kısa, Türkçe, tek cümlelik açıklama"}, ...]}
+
+"hatalar" dizisi, işaretli 3 kelimenin metinde göründükleri sırayla olsun.`;
+}
+
+async function avciUret(kelimeler) {
+  const veri = await anthropicIstek({
+    model: AI_MODEL,
+    max_tokens: AI_AVCI_MAX_TOKENS,
+    messages: [{ role: 'user', content: avciIstemOlustur(kelimeler) }]
+  });
+  const metin = yanitMetni(veri);
+
+  let sonuc;
+  try { sonuc = JSON.parse(jsonAyikla(metin)); }
+  catch (h) { throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 200)); }
+  if (!sonuc || typeof sonuc !== 'object') {
+    throw new Error('Yanıt bir JSON nesnesi değil — ham metin: ' + metin.slice(0, 200));
+  }
+  if (typeof sonuc.metin !== 'string' || !sonuc.metin.includes('{{')) {
+    throw new Error('Yanıtta metin alanı eksik ya da işaretli kelime yok — ham metin: ' + metin.slice(0, 200));
+  }
+  const isaretSayisi = (sonuc.metin.match(/\{\{.+?\}\}/g) || []).length;
+  if (!Array.isArray(sonuc.hatalar) || isaretSayisi === 0 || sonuc.hatalar.length !== isaretSayisi) {
+    throw new Error('Yanıttaki hatalar dizisi işaretli kelime sayısıyla uyuşmuyor — ham metin: ' + metin.slice(0, 300));
+  }
+  if (!sonuc.hatalar.every(hh => hh && typeof hh.dogrusu === 'string' && hh.dogrusu.trim() &&
+      typeof hh.aciklama === 'string' && hh.aciklama.trim())) {
+    throw new Error('Yanıttaki hatalar dizisinde eksik alan var — ham metin: ' + metin.slice(0, 300));
+  }
+
+  return { metin: sonuc.metin, hatalar: sonuc.hatalar };
+}
+
+// {{ }} ile isaretli hatali kelimeleri metinden ayirip diger her sozcugu
+// ayri bir token yapar; isaretler ekranda gosterilmez, sadece hangi token'in
+// gercekte hatali oldugunu (hataIndeksi -> hatalar dizisindeki sirasi) tasir.
+function avciTokenlariCikar(metin) {
+  const parcalar = metin.split(/\{\{(.+?)\}\}/);
+  const tokenler = [];
+  let hataSirasi = 0;
+  parcalar.forEach((parca, i) => {
+    if (i % 2 === 1) {
+      tokenler.push({ metin: parca.trim(), hatali: true, hataIndeksi: hataSirasi++ });
+    } else {
+      parca.trim().split(/\s+/).filter(Boolean).forEach(kelime => {
+        tokenler.push({ metin: kelime, hatali: false });
+      });
+    }
+  });
+  return tokenler;
+}
+
+function oyunAvciBaslat(kelimeler) {
+  const havuz = karistir(kelimeler.slice()).slice(0, Math.min(15, kelimeler.length));
+  const istekNo = ++OYUN_ISTEK_NO;
+  document.getElementById('oyunBaslik').textContent = 'Hatalı Kelime Avı';
+  panelAc('pOyun');
+  document.getElementById('oyunIcerik').innerHTML = `<p class="yardim">Metin hazırlanıyor...</p>`;
+
+  avciUret(havuz).then(({ metin, hatalar }) => {
+    if (istekNo !== OYUN_ISTEK_NO) return;
+    OH = { tokenler: avciTokenlariCikar(metin), hatalar, secili: new Set(), bitti: false };
+    oyunAvciCiz();
+  }).catch(h => {
+    if (istekNo !== OYUN_ISTEK_NO) return;
+    oyunAiHatasiCiz(h.message || 'Metin üretilemedi', () => oyunAvciBaslat(kelimeler));
+  });
+}
+
+function oyunAvciCiz() {
+  document.getElementById('oyunIcerik').innerHTML = `
+    <p class="yardim">Yanlış anlamda kullanılmış olduğunu düşündüğün kelimelere dokun, sonra kontrol et.</p>
+    <div class="oyun-tokenler" id="oyunAvciTokenler">
+      ${OH.tokenler.map((t, i) => `<button class="oyun-token${OH.secili.has(i) ? ' secili' : ''}" data-token-idx="${i}">${kac(t.metin)}</button>`).join('')}
+    </div>
+    <button class="birincil" id="oyunAvciKontrol">Kontrol et</button>`;
+
+  document.querySelectorAll('#oyunAvciTokenler [data-token-idx]').forEach(b => {
+    b.onclick = () => {
+      const i = parseInt(b.dataset.tokenIdx, 10);
+      if (OH.secili.has(i)) OH.secili.delete(i); else OH.secili.add(i);
+      b.classList.toggle('secili');
+    };
+  });
+  document.getElementById('oyunAvciKontrol').onclick = oyunAvciKontrolEt;
+}
+
+function oyunAvciKontrolEt() {
+  if (OH.bitti) return;
+  OH.bitti = true;
+
+  const bulunanHatalar = new Set();
+  let yanlisIsaret = 0;
+  const tokenlerH = OH.tokenler.map((t, i) => {
+    const secilmis = OH.secili.has(i);
+    if (t.hatali && secilmis) { bulunanHatalar.add(t.hataIndeksi); return `<span class="oyun-token oyun-token-dogru">${kac(t.metin)}</span>`; }
+    if (t.hatali && !secilmis) return `<span class="oyun-token oyun-token-kacirilan">${kac(t.metin)}</span>`;
+    if (!t.hatali && secilmis) { yanlisIsaret++; return `<span class="oyun-token oyun-token-yanlis-isaret">${kac(t.metin)}</span>`; }
+    return `<span class="oyun-token">${kac(t.metin)}</span>`;
+  }).join(' ');
+
+  const bulunan = bulunanHatalar.size;
+  const netPuan = bulunan - yanlisIsaret;
+  const toplamHata = OH.hatalar.length;
+  const yanlislar = OH.hatalar.map((hh, i) => ({
+    ad: 'Doğrusu: ' + hh.dogrusu,
+    alt: hh.aciklama + (bulunanHatalar.has(i) ? ' — buldun' : ' — kaçırdın')
+  }));
+
+  document.getElementById('oyunIcerik').innerHTML = `
+    <p class="oyun-metin">${tokenlerH}</p>
+    <button class="birincil" id="oyunAvciBitirBtn">Sonucu gör</button>`;
+  document.getElementById('oyunAvciBitirBtn').onclick = () => {
+    OH = null;
+    oyunSonucCiz('Hatalı Kelime Avı', bulunan, toplamHata, null, yanlislar, [{ etiket: 'Net puan', deger: netPuan }]);
+  };
+}
+
 // pOyun kapatilirken artikel turunun bekleyen geri bildirim zamanlayicisini
-// iptal et — aksi halde panel kapandiktan sonra bile gizli DOM'a yazmaya devam eder
+// iptal et — aksi halde panel kapandiktan sonra bile gizli DOM'a yazmaya devam
+// eder. OYUN_ISTEK_NO'yu artirmak, bosluk/avci icin o an bekleyen bir API
+// yanitinin kapanmis panele yazmasini onler.
 document.querySelector('#pOyun [data-kapat]').onclick = () => {
   clearTimeout(oyunZamanlayici);
-  OA = null; OC = null;
+  OYUN_ISTEK_NO++;
+  OA = null; OC = null; OB = null; OH = null;
   panelKapat();
 };
 
