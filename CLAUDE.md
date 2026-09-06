@@ -163,6 +163,49 @@ doldurulmuşsa hiç görünmezdi — "gruba göre çalış" tam olarak bunu önl
 için var. Bu, `planla()`'nın ürettiği aralık/zamanlama mantığına dokunmaz,
 sadece hangi yeni kartların günün kotasından muaf tutulacağına dair.
 
+## Oyunlar
+
+Menüdeki "Oyunlar" girişi, iki API gerektirmeyen mini oyun sunar: **Artikel
+Turu** (isimlerin artikelini der/die/das düğmeleriyle tahmin etme) ve
+**Cümle Dizme** (kayıtlı örnek cümlelerin kelimelerini doğru sıraya dizme).
+Kod, "Paneller" bölümünde `OYUNLAR` tanımıyla başlar.
+
+**Bilinçli olarak `ILERLEME`'ye hiç dokunmaz.** Oyunlar bir ölçme katmanı,
+öğrenme motoru ayrı kalır — `planla()` hiç çağrılmaz, `wortkasten:ilerleme`
+hiç yazılmaz. Bir oyunda yanlış yapmak o kelimenin tekrar zamanlamasını
+değiştirmez.
+
+**Kapsam seçimi kendi değişkeninde.** Oyun seçilince "Tüm kelimeler" ya da
+bir grup sorulur; grup listesi `grupSayilari()`'nden, "gruba göre çalış"
+ile aynı kaynaktan gelir. Seçim `GRUP_FILTRESI`'ni **değiştirmez** —
+`OYUN_SECILI` ve kapsam parametresi sadece o oyun oturumu için kullanılır,
+kalıcı değildir, çalışma kuyrusunu etkilemez.
+
+**Yetersiz kelime kontrolü.** Her oyun tanımında `minKelime` ve
+`uygunKelimeler()` (kapsamdaki hangi kelimelerin bu oyuna uygun olduğunu
+belirleyen filtre) var. Seçilen kapsamda yeterli uygun kelime yoksa oyun
+başlamaz, `gerekMetni` ile kaç kelime gerektiği açıkça söylenir.
+
+- **Artikel Turu**: kapsamdaki `tur === 'isim'` ve artikeli olan kelimeler
+  arasından en az 5 gerekir. Tur uzunluğu `min(20, uygun kelime sayısı)`.
+  Doğru cevapta o artikelin `.artikel-bant` bandıyla (çalışma kartlarındaki
+  aynı görsel dil) kısa bir geri bildirim, yanlışta doğru cevap aynı bantla
+  gösterilip daha uzun bir duraklama olur — bu duraklamalar `oyunZamanlayici`
+  ile yönetilir, panel `data-kapat` ile kapatılırken bu zamanlayıcı iptal
+  edilir (aksi halde kapanmış panelin gizli DOM'una yazmaya devam eder).
+  Süre `Date.now()` farkıyla tutulur, sonuçta gösterilir.
+- **Cümle Dizme**: kapsamdaki `cumle` alanı `{{` içeren kelimelerden en az
+  5 gerekir, 5 cümle oynatılır. `cumleTokenlari()` `{{ }}` işaretlemesini
+  kaldırıp cümleyi boşluktan böler — noktalama işaretleri böylece kendinden
+  önceki kelimeye yapışık kalır, ayrı bir parça olmaz. Karıştırılan sıranın
+  orijinalle aynı çıkmaması için `do...while` ile tekrar karıştırılır.
+
+**Sonuç ekranı.** Her iki oyun da aynı `oyunSonucCiz()` fonksiyonunu
+kullanır: doğru sayısı, (Artikel Turu'nda) süre, ve yanlış yapılan
+kelimelerin tıklanabilir listesi. Bir satıra basmak `formuDoldur()` ile
+düzenleme ekranını açar — normal kelime düzenleme akışının aynısı, GitHub
+senkronu dahil.
+
 ## Değişiklik sonrası kontrol listesi
 
 1. `index.html` veya `sw.js` değiştiyse `sw.js` içindeki `SURUM` sabitini

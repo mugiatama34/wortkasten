@@ -107,6 +107,22 @@ Fotoğraftan kelime eklerken, fotoğraf seçildikten hemen sonra bir grup adı
 sorulur (daha önce kullanılmış adlar önerilir). O fotoğraftan çıkan ve
 onayladığın tüm kelimeler bu grupla kaydedilir.
 
+## Oyunlar
+
+Menü → Oyunlar iki mini oyun sunar, ikisi de API gerektirmez:
+
+- **Artikel Turu** — isimlerin artikelini (der/die/das) tahmin et. En az
+  5 isim gerekir, tur 20 kelime veya kapsamdaki tüm isimler (hangisi
+  azsa) sürer. Süre tutulur.
+- **Cümle Dizme** — kayıtlı örnek cümlelerin kelimelerini doğru sıraya
+  diz. En az 5 örnek cümleli kelime gerekir, 5 cümle oynanır.
+
+Oyun seçilince kapsam sorulur: tüm kelimeler ya da belirli bir grup.
+Seçilen kapsamda oyunu oynatacak kadar uygun kelime yoksa bu açıkça
+söylenir. Oyunlar tekrar geçmişine ve zamanlamaya dokunmaz — sadece
+mevcut bilgini ölçer. Sonunda skor ve yanlış yapılan kelimelerin
+listesi gösterilir, listeden bir kelimeye basınca düzenleme ekranı açılır.
+
 ## Yedekleme
 
 Tarayıcı depolaması kalıcı değil. Menü → Yedekle ve aktar → "Yedek dosyası
