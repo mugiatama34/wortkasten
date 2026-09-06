@@ -516,6 +516,152 @@
       "tr": "Biriyle sizli konusmak",
       "cumle": "Bei uns ist es ganz kormal, dass sich alle mit Sie {{ansprechen}}",
       "cumle_tr": ""
+    },
+    {
+      "id": "umtpogju10",
+      "tur": "isim",
+      "de": "Vorgesetzter",
+      "tr": "amir, patron",
+      "cumle": "Der {{Vorgesetzte}} hat neue Aufgaben verteilt.",
+      "cumle_tr": "Amir yeni görevler dağıttı.",
+      "artikel": "der",
+      "cogul": "Vorgesetzten"
+    },
+    {
+      "id": "umtpogju11",
+      "tur": "isim",
+      "de": "Arbeitsanweisung",
+      "tr": "çalışma talimatı",
+      "cumle": "Die {{Arbeitsanweisung}} war sehr klar formuliert.",
+      "cumle_tr": "Çalışma talimatı çok açık ifade edilmişti.",
+      "artikel": "die",
+      "cogul": "Arbeitsanweisungen"
+    },
+    {
+      "id": "umtpogju12",
+      "tur": "isim",
+      "de": "Personalabteilung",
+      "tr": "insan kaynakları departmanı",
+      "cumle": "Er ging direkt zur {{Personalabteilung}}.",
+      "cumle_tr": "Doğrudan insan kaynakları departmanına gitti.",
+      "artikel": "die",
+      "cogul": "Personalabteilungen"
+    },
+    {
+      "id": "umtpogju13",
+      "tur": "isim",
+      "de": "Arbeitnehmer",
+      "tr": "çalışan",
+      "cumle": "Jeder {{Arbeitnehmer}} hat feste Rechte.",
+      "cumle_tr": "Her çalışanın sabit hakları vardır.",
+      "artikel": "der",
+      "cogul": "Arbeitnehmer"
+    },
+    {
+      "id": "umtpogju14",
+      "tur": "isim",
+      "de": "Rundgang",
+      "tr": "tur, gezinti",
+      "cumle": "Wir machen zuerst einen {{Rundgang}} durch den Betrieb.",
+      "cumle_tr": "Önce işletmede bir tur atacağız.",
+      "artikel": "der",
+      "cogul": "Rundgänge"
+    },
+    {
+      "id": "umtpogju15",
+      "tur": "isim",
+      "de": "Buchhaltung",
+      "tr": "muhasebe",
+      "cumle": "Er arbeitet seit Jahren in der {{Buchhaltung}}.",
+      "cumle_tr": "Yıllardır muhasebede çalışıyor.",
+      "artikel": "die",
+      "cogul": "Buchhaltungen"
+    },
+    {
+      "id": "umtpogju16",
+      "tur": "isim",
+      "de": "Pate",
+      "tr": "rehber, kılavuz kişi",
+      "cumle": "Als neuer Kollege bekommst du einen {{Paten}}.",
+      "cumle_tr": "Yeni bir çalışan olarak bir rehber alırsın.",
+      "artikel": "der",
+      "cogul": "Paten"
+    },
+    {
+      "id": "umtpogju17",
+      "tur": "isim",
+      "de": "Räumlichkeit",
+      "tr": "mekân, tesis",
+      "cumle": "Die {{Räumlichkeiten}} sind modern eingerichtet.",
+      "cumle_tr": "Mekânlar modern şekilde döşenmiş.",
+      "artikel": "die",
+      "cogul": "Räumlichkeiten"
+    },
+    {
+      "id": "umtpogju18",
+      "tur": "isim",
+      "de": "Laborbereich",
+      "tr": "laboratuvar bölümü",
+      "cumle": "Der {{Laborbereich}} liegt hinter dem Gebäude.",
+      "cumle_tr": "Laboratuvar bölümü binanın arkasındadır.",
+      "artikel": "der",
+      "cogul": "Laborbereiche"
+    },
+    {
+      "id": "umtpogju19",
+      "tur": "isim",
+      "de": "Lohnsteuerkarte",
+      "tr": "ücret vergisi kartı",
+      "cumle": "Die {{Lohnsteuerkarte}} muss beim Arbeitgeber liegen.",
+      "cumle_tr": "Ücret vergisi kartı işverende bulunmalıdır.",
+      "artikel": "die",
+      "cogul": "Lohnsteuerkarten"
+    },
+    {
+      "id": "umtpogju1a",
+      "tur": "isim",
+      "de": "Unterlage",
+      "tr": "belge, evrak",
+      "cumle": "Bitte bringen Sie alle wichtigen {{Unterlagen}} mit.",
+      "cumle_tr": "Lütfen tüm önemli belgeleri getirin.",
+      "artikel": "die",
+      "cogul": "Unterlagen"
+    },
+    {
+      "id": "umtpogju1b",
+      "tur": "sifat",
+      "de": "weitgehend",
+      "tr": "büyük ölçüde",
+      "cumle": "Das Team arbeitet {{weitgehend}} selbstständig.",
+      "cumle_tr": "Ekip büyük ölçüde bağımsız çalışıyor."
+    },
+    {
+      "id": "umtpogju1c",
+      "tur": "isim",
+      "de": "Produktpalette",
+      "tr": "ürün yelpazesi",
+      "cumle": "Die Firma hat ihre {{Produktpalette}} stark erweitert.",
+      "cumle_tr": "Şirket ürün yelpazesini büyük ölçüde genişletti.",
+      "artikel": "die",
+      "cogul": "Produktpaletten"
+    },
+    {
+      "id": "umtpogju1d",
+      "tur": "fiil",
+      "de": "gründen",
+      "tr": "kurmak",
+      "cumle": "Das Unternehmen wurde vor Jahrzehnten {{gegründet}}.",
+      "cumle_tr": "Şirket on yıllar önce kuruldu.",
+      "formlar": "gründet, gründete, hat gegründet"
+    },
+    {
+      "id": "umtpogju1e",
+      "tur": "fiil",
+      "de": "installieren",
+      "tr": "kurmak, yüklemek",
+      "cumle": "Er soll die Kameras {{installieren}}.",
+      "cumle_tr": "Kameraları kurması gerekiyor.",
+      "formlar": "installiert, installierte, hat installiert"
     }
   ]
 }
