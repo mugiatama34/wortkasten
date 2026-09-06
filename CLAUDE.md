@@ -206,10 +206,22 @@ sadece hangi yeni kartların günün kotasından muaf tutulacağına dair.
 
 ## Oyunlar
 
-Menüdeki "Oyunlar" girişi, iki API gerektirmeyen mini oyun sunar: **Artikel
-Turu** (isimlerin artikelini der/die/das düğmeleriyle tahmin etme) ve
-**Cümle Dizme** (kayıtlı örnek cümlelerin kelimelerini doğru sıraya dizme).
-Kod, "Paneller" bölümünde `OYUNLAR` tanımıyla başlar.
+Menüdeki "Oyunlar" girişi dört mini oyun sunar. İlk ikisi API gerektirmez:
+**Artikel Turu** (isimlerin artikelini der/die/das düğmeleriyle tahmin etme)
+ve **Cümle Dizme** (kayıtlı örnek cümlelerin kelimelerini doğru sıraya
+dizme). Son ikisi Anthropic API'sini kullanır: **Boşluk Doldurma** (yapay
+zekânın ürettiği bir metindeki boşlukları doldurma) ve **Hatalı Kelime Avı**
+(yapay zekânın ürettiği metinde yanlış bağlamda kullanılmış kelimeleri
+bulma). Kod, "Paneller" bölümünde `OYUNLAR` tanımıyla başlar.
+
+**API gerektiren oyunlar anahtar yoksa pasif görünür.** `OYUNLAR[id].apiGerekli`
+`true` olan bir oyun, `API_ANAHTARI` boşsa oyun listesinde `disabled` bir
+düğme olarak görünür, açıklama metni yerine "API anahtarı gerekiyor —
+Ayarlar'dan ekleyebilirsin" yazar (`oyunListesiCiz()`). Kapsam seçim
+ekranında da (`pOyunKapsam`) bu oyunlar için sabit bir maliyet notu
+gösterilir (`oyunKapsamMaliyet`, `tanim.apiGerekli`'ye göre gizlenir/açılır)
+— her oynayışın bir API çağrısı yaptığını, dolayısıyla küçük bir maliyete
+yol açtığını belirtir.
 
 **Bilinçli olarak `ILERLEME`'ye hiç dokunmaz.** Oyunlar bir ölçme katmanı,
 öğrenme motoru ayrı kalır — `planla()` hiç çağrılmaz, `wortkasten:ilerleme`
@@ -244,12 +256,60 @@ başlamaz, `gerekMetni` ile kaç kelime gerektiği açıkça söylenir.
   koyduğu kelimeyle eşleşmeyen kelimeler `.oyun-fark` sınıfıyla vurgulanır
   (pozisyon bazlı karşılaştırma — `dogruSira[i] !== verilenTokenler[i]`).
   Kelimenin `cumle_tr` alanı varsa altında ayrıca gösterilir.
+- **Boşluk Doldurma**: kapsamdan en az 8 kelime gerekir; `min(10, kapsamdaki
+  kelime sayısı)` kadarı rastgele seçilip `boslukUret()` ile modelden
+  5-8 cümlelik, bu kelimelerin HEPSİNİ kullanan bağlı bir Almanca metin
+  istenir. İstem, kelimeleri kayıtlı örnek cümlelerinden **farklı** bir
+  bağlamda kullanmasını açıkça ister — amaç kelimenin başka cümlelerde de
+  işe yaradığını ölçmek. Model her kelimenin metindeki yerini, gönderilen
+  listedeki 1 tabanlı numarasıyla `{{N}}` olarak işaretler; ayrıca aynı
+  sırada beklenen çekimli biçimleri taşıyan bir `cevaplar` dizisi döner.
+  `boslukUret()` yanıtı doğrularken `{{N}}` işaretlerinin 1..kelime sayısı
+  aralığını birebir (eksiksiz, tekrarsız) kapladığını kontrol eder, aksi
+  halde ham metni içeren bir hata fırlatır. Ekranda metin, boşluklar yerine
+  metin girişleriyle (`oyunBoslukTokenlariCiz()`) gösterilir; "Kontrol et"
+  tüm boşlukları aynı anda değerlendirir. Değerlendirme, cümle kartındaki
+  yazarak cevap moduyla **birebir aynı** `karsilastirmaBicimi()`/
+  `levenshtein()` çiftini kullanır: mesafe 0 doğru, 1 "neredeyse doğru",
+  fazlası yanlış. Sonuç ekranındaki yanlış/neredeyse-doğru kelimeler
+  `oyunSonucCiz()`'e gerçek kelime nesneleri olarak geçirilir (tıklanınca
+  düzenlenebilir).
+- **Hatalı Kelime Avı**: kapsamdan en az 6 kelime gerekir; `min(15, kapsamdaki
+  kelime sayısı)` kadarı rastgele havuz olarak `avciUret()` ile modele
+  gönderilir, model bunlardan seçtikleriyle 6-8 cümlelik bir metin kurar ve
+  bilinçli olarak TAM 3 kelimeyi dilbilgisi doğru ama anlamca yanlış bir
+  bağlamda kullanır. Bu 3 kelime, `cumle` alanındaki tek-hedef işaretlemesiyle
+  aynı yazımla (`{{...}}`) işaretlenir; model ayrıca aynı sırada `hatalar`
+  dizisinde her biri için doğru kelimeyi ve kısa bir açıklamayı döner.
+  `avciTokenlariCikar()` işaretleri metinden ayırıp diğer her sözcüğü ayrı
+  bir tıklanabilir jetona (token) çevirir — işaretler ekranda HİÇ
+  görünmez, sadece hangi jetonun gerçekte hatalı olduğunu (`hataIndeksi`)
+  dahili olarak taşır. Kullanıcı şüphelendiği jetonlara dokunup işaretler,
+  "Kontrol et" ile karşılaştırma yapılır: doğru bulunan her hata +1,
+  yanlış işaretlenen her doğru kelime -1 puandır (net puan sonuç ekranında
+  ayrı bir satırda gösterilir, `oyunSonucCiz()`'in isteğe bağlı 6. parametresi
+  `ekstra` ile). Sonuç listesindeki ögeler burada gerçek kelime nesneleri
+  değil, salt bilgi amaçlı `{ad, alt}` çiftleridir (doğru kelime + açıklama +
+  bulundu/kaçırıldı bilgisi) — tıklanamaz, sadece görüntülenir.
 
-**Sonuç ekranı.** Her iki oyun da aynı `oyunSonucCiz()` fonksiyonunu
-kullanır: doğru sayısı, (Artikel Turu'nda) süre, ve yanlış yapılan
-kelimelerin tıklanabilir listesi. Bir satıra basmak `formuDoldur()` ile
-düzenleme ekranını açar — normal kelime düzenleme akışının aynısı, GitHub
-senkronu dahil.
+**Sonuç ekranı.** Dört oyun da aynı `oyunSonucCiz(baslik, dogru, toplam,
+sureMs, yanlislar, ekstra)` fonksiyonunu kullanır: doğru sayısı, (varsa)
+süre, (varsa) `ekstra` ile ek istatistik satırları, ve bir gözden geçirme
+listesi. Bu listedeki her öge ya gerçek bir kelime nesnesidir (`k.tur`
+alanı var — tıklanınca `formuDoldur()` ile normal kelime düzenleme akışı
+açılır, GitHub senkronu dahil) ya da salt bilgi amaçlı bir `{ad, alt}`
+çiftidir (Hatalı Kelime Avı'nın açıklamaları gibi — tıklanamaz). Hangisi
+olduğu ilk ögenin `tur` alanının varlığına bakılarak anlaşılır, başlık da
+buna göre "Yanlış yapılan kelimeler" ya da "Ayrıntılar" olur.
+
+**API isteği sırasında panel kapatılırsa.** `oyunBoslukBaslat()` ve
+`oyunAvciBaslat()`, isteği başlatırken `OYUN_ISTEK_NO`'yu artırıp yerel bir
+kopyasını saklar; yanıt (veya hata) geldiğinde bu değer hâlâ güncel
+`OYUN_ISTEK_NO` ile eşleşmiyorsa hiçbir şey yazmaz. `#pOyun`'un
+`data-kapat` düğmesi de `OYUN_ISTEK_NO`'yu artırır — böylece kullanıcı
+"Metin hazırlanıyor..." ekranındayken paneli kapatırsa, sonradan gelen
+yanıt kapanmış panelin gizli DOM'una yazmaya devam etmez (Artikel
+Turu'ndaki `oyunZamanlayici` iptaliyle aynı amaç, farklı bir mekanizma).
 
 ## Değişiklik sonrası kontrol listesi
 
@@ -268,7 +328,10 @@ senkronu dahil.
 Kelime ekleme panelindeki "Cümle öner" düğmesi, girilen Almanca kelime,
 tür ve Türkçe karşılığını Anthropic'in Messages API'sine gönderip örnek
 cümle ve çevirisini önerir. Kullanıcı öneriyi kaydetmeden önce
-düzenleyebilir — otomatik kaydetme yok.
+düzenleyebilir — otomatik kaydetme yok. Oyunlar bölümündeki Boşluk
+Doldurma ve Hatalı Kelime Avı da aynı API'yi kullanır (`AI_MODEL`,
+`AI_BOSLUK_MAX_TOKENS`/`AI_AVCI_MAX_TOKENS`) — ayrıntıları için "Oyunlar"
+bölümüne bak.
 
 - **Model adı** `index.html` başındaki `AI_MODEL` sabitinde tanımlı.
   Değiştirmek için sadece o sabiti güncelle.
