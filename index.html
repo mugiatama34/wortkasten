@@ -60,6 +60,14 @@ header{
 }
 .grup-cubugu button{color:var(--der);font-weight:600;font-size:.85rem}
 
+/* birlestirilmis panel bloklari — display'i .gizli'den once tanimlaniyor ki
+   ".gizli" toggle'i her zaman kazansin (ayni satirdaki kural son yazan kazanir) */
+.secim-alan{
+  display:flex;flex-direction:column;gap:10px;padding:12px 14px;
+  background:var(--yuzey2);border-radius:10px;
+}
+.foto-grup-sor{display:flex;flex-direction:column;gap:10px}
+
 /* ---------- kart alani ---------- */
 main{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;padding:18px 16px}
 .kart{
@@ -276,11 +284,24 @@ button:disabled{opacity:.55;cursor:default}
 
 <!-- ==================== KELİMELER (liste) ==================== -->
 <div class="panel" id="pListe">
-  <div class="panel-bas"><h2>Kelimeler</h2><button data-kapat="pListe">Kapat</button></div>
+  <div class="panel-bas">
+    <h2>Kelimeler</h2>
+    <button id="lSecModu">Seç</button>
+    <button data-kapat="pListe">Kapat</button>
+  </div>
   <div class="panel-icerik">
     <div class="satir-flex">
       <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
       <select id="lGrupFiltre" style="width:auto;flex:0 0 auto"></select>
+    </div>
+    <div id="lSecimAlan" class="gizli secim-alan">
+      <label class="ayar-onay"><input type="checkbox" id="lTumunuSec"> Tümünü seç (görünenler)</label>
+      <div class="satir-flex">
+        <input id="lTopluGrup" list="grupOnerilerToplu" autocomplete="off" placeholder="Grup adı">
+        <button type="button" class="ikincil" id="lTopluGrupUygula">Grup ata</button>
+      </div>
+      <datalist id="grupOnerilerToplu"></datalist>
+      <p class="yardim" id="lSecimBilgi">Hiç kelime seçili değil</p>
     </div>
     <div id="listeSonuc" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
@@ -402,7 +423,7 @@ button:disabled{opacity:.55;cursor:default}
     </p>
     <input type="file" id="fotoDosya" accept="image/*" capture="environment" class="gizli">
     <button type="button" class="birincil" id="fotoSec">Fotoğraf seç</button>
-    <div id="fotoGrupSor" class="gizli" style="display:flex;flex-direction:column;gap:10px">
+    <div id="fotoGrupSor" class="gizli foto-grup-sor">
       <label>Grup <span style="opacity:.7">— isteğe bağlı, örn. ünite adı</span>
         <input id="fotoGrupGiris" list="grupOnerilerFoto" autocomplete="off" placeholder="Ünite 3">
       </label>
@@ -529,7 +550,7 @@ const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v20';
+const SURUM = 'wortkasten-v21';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -2030,6 +2051,9 @@ function fotoOgeHtml(a, i, tekrarMi) {
       <input type="checkbox" id="fo-sec-${i}" ${tekrarMi ? '' : 'checked'}>
       <span>${a.seviye ? kac(a.seviye) : ''}${tekrarMi ? ' · <span class="foto-tekrar">listede zaten var</span>' : ''}</span>
     </div>
+    <label>Grup <span style="opacity:.7">— isteğe bağlı</span>
+      <input id="fo-grup-${i}" list="grupOnerilerFoto" autocomplete="off" value="${kac(a.grup || '')}" placeholder="Ünite 3">
+    </label>
     <label>Tür
       <select id="fo-tur-${i}">
         <option value="isim">isim</option>
@@ -2122,7 +2146,9 @@ document.getElementById('fotoDosya').onchange = (e) => {
 
   fotoSeciliDosya = dosya;
   grupOnerileriDoldur('grupOnerilerFoto');
-  document.getElementById('fotoGrupGiris').value = '';
+  // onceki fotografta girilen grup adiyla doldur — ayni unitenin ikinci
+  // sayfasini eklerken yeniden yazmaya gerek kalmasin (bkz. CLAUDE.md)
+  document.getElementById('fotoGrupGiris').value = fotoPartiGrubu;
   document.getElementById('fotoSec').classList.add('gizli');
   document.getElementById('fotoGrupSor').classList.remove('gizli');
   document.getElementById('fotoGrupGiris').focus();
@@ -2135,8 +2161,6 @@ async function fotoIslemeBasla() {
   document.getElementById('fotoGrupSor').classList.add('gizli');
   document.getElementById('fotoSec').classList.remove('gizli');
 
-  fotoAdaylar = [];
-  fotoSonucCiz();
   const secBtn = document.getElementById('fotoSec');
   secBtn.disabled = true;
 
@@ -2146,9 +2170,17 @@ async function fotoIslemeBasla() {
 
     const sonuc = await gorselKelimeCikar(b64, fotoDurumGoster);
 
-    fotoAdaylar = sonuc.liste;
+    // her aday, cikarildigi andaki fotoPartiGrubu ile etiketlenir ve mevcut
+    // fotoAdaylar dizisine EKLENIR (ustune yazilmaz) — boylece ayni onay
+    // ekranina birden fazla fotograf (ayni unitenin sonraki sayfalari)
+    // eklenebilir, her biri kendi grubunu tasir; nihai ekleme adaya
+    // hangi yoldan gelmis olursa olsun bu degeri kullanir (bkz. CLAUDE.md
+    // "Fotoğraftan kelime çıkarma")
+    const yeniAdaylar = sonuc.liste.map(o => Object.assign({ grup: fotoPartiGrubu }, o));
+    fotoAdaylar = fotoAdaylar.concat(yeniAdaylar);
+
     fotoDurumGoster(
-      fotoAdaylar.length + ' kelime bulundu' +
+      yeniAdaylar.length + ' kelime bulundu' +
       (fotoPartiGrubu ? ' — grup: ' + fotoPartiGrubu : '') +
       (sonuc.kesikMi ? ' — sayfanın tamamı işlenemedi, kalanlar için tekrar deneyin' : ''),
       sonuc.kesikMi
@@ -2188,7 +2220,10 @@ document.getElementById('fotoEkleBtn').onclick = () => {
       govde.cogul = document.getElementById(`fo-cogul-${i}`).value.trim();
     }
     if (tur === 'fiil') govde.formlar = document.getElementById(`fo-formlar-${i}`).value.trim();
-    if (fotoPartiGrubu) govde.grup = fotoPartiGrubu;
+    // her satirin kendi grup alanindan okunur — hangi fotograftan/kurtarma
+    // dalindan geldigine bakilmaksizin onay ekranindaki deger esas alinir
+    const grup = document.getElementById(`fo-grup-${i}`).value.trim();
+    if (grup) govde.grup = grup;
     govdeler.push(govde);
   });
 
@@ -2297,6 +2332,16 @@ async function ghKelimeSil(id, adi) {
   );
 }
 
+// toplu grup atama — birden fazla kelimeyi TEK bir commit ile gunceller,
+// kelime basina ayri commit atmaz (bkz. CLAUDE.md "Kelime gruplari")
+async function ghKelimeleriTopluGuncelle(idler, grup) {
+  const idSeti = new Set(idler);
+  return ghKelimelerYazGovde(
+    liste => liste.map(k => idSeti.has(k.id) ? Object.assign({}, k, { grup }) : k),
+    idler.length + ' kelimeye grup ata: ' + grup
+  );
+}
+
 async function senkronEt() {
   if (!GH_TOKEN || !BEKLEYEN.length || senkronDevamEdiyor) return;
   senkronDevamEdiyor = true;
@@ -2370,6 +2415,23 @@ function lGrupFiltreDoldur() {
   if ([...sel.options].some(o => o.value === secili)) sel.value = secili;
 }
 
+// coklu secim modu: liste ekraninda birden fazla kelime secip toplu islem
+// yapmaya yarar (bkz. CLAUDE.md "Kelime gruplari" — toplu grup atama).
+// Kalici degil, panel her kapandiginda sifirlanir.
+let listeSecimModu = false;
+let listeSecili = new Set();          // secim modunda secili kelime id'leri
+let listeSonGosterilenIdler = [];     // en son cizilen (arama/filtre uygulanmis) id'ler
+
+function listeSecimBilgiGuncelle() {
+  const bilgi = document.getElementById('lSecimBilgi');
+  if (bilgi) bilgi.textContent = listeSecili.size
+    ? listeSecili.size + ' kelime seçili'
+    : 'Hiç kelime seçili değil';
+  const tumu = document.getElementById('lTumunuSec');
+  if (tumu) tumu.checked = listeSonGosterilenIdler.length > 0 &&
+    listeSonGosterilenIdler.every(id => listeSecili.has(id));
+}
+
 function listeCiz() {
   lGrupFiltreDoldur();
   const q = document.getElementById('lArama').value.trim().toLocaleLowerCase('tr-TR');
@@ -2385,8 +2447,37 @@ function listeCiz() {
   if (grupSecim === '__grupsuz__') gosterilecek = gosterilecek.filter(k => !(k.grup || '').trim());
   else if (grupSecim) gosterilecek = gosterilecek.filter(k => (k.grup || '').trim() === grupSecim);
 
+  listeSonGosterilenIdler = gosterilecek.map(k => k.id);
+
   if (!gosterilecek.length) {
     el.innerHTML = `<p class="yardim">Eşleşen kelime yok.</p>`;
+    if (listeSecimModu) listeSecimBilgiGuncelle();
+    return;
+  }
+
+  if (listeSecimModu) {
+    el.innerHTML = gosterilecek.map(k => {
+      const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+      const kartIdleri = harita.get(k.id) || [];
+      const durum = kelimeDurumu(kartIdleri);
+      const grupMetni = k.grup ? ' · ' + kac(k.grup) : '';
+      return `<label class="liste-satir" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+        <input type="checkbox" data-sec-id="${kac(k.id)}" style="width:auto;margin-top:3px" ${listeSecili.has(k.id) ? 'checked' : ''}>
+        <span style="flex:1">
+          <div class="liste-bas">${kac(bas)}</div>
+          <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}</div>
+        </span>
+      </label>`;
+    }).join('');
+
+    el.querySelectorAll('[data-sec-id]').forEach(cb => {
+      cb.onchange = () => {
+        if (cb.checked) listeSecili.add(cb.dataset.secId);
+        else listeSecili.delete(cb.dataset.secId);
+        listeSecimBilgiGuncelle();
+      };
+    });
+    listeSecimBilgiGuncelle();
     return;
   }
 
@@ -2412,6 +2503,84 @@ function listeCiz() {
 }
 document.getElementById('lArama').oninput = listeCiz;
 document.getElementById('lGrupFiltre').onchange = listeCiz;
+
+function listeSecimModunuKapat() {
+  listeSecimModu = false;
+  listeSecili.clear();
+  document.getElementById('lSecModu').textContent = 'Seç';
+  document.getElementById('lSecimAlan').classList.add('gizli');
+}
+
+document.getElementById('lSecModu').onclick = () => {
+  listeSecimModu = !listeSecimModu;
+  document.getElementById('lSecModu').textContent = listeSecimModu ? 'Vazgeç' : 'Seç';
+  document.getElementById('lSecimAlan').classList.toggle('gizli', !listeSecimModu);
+  if (listeSecimModu) grupOnerileriDoldur('grupOnerilerToplu');
+  else listeSecili.clear();
+  listeCiz();
+};
+
+document.getElementById('lTumunuSec').onchange = (e) => {
+  if (e.target.checked) listeSonGosterilenIdler.forEach(id => listeSecili.add(id));
+  else listeSonGosterilenIdler.forEach(id => listeSecili.delete(id));
+  listeCiz();
+};
+
+// pListe'nin kendi kapat dugmesi: genel [data-kapat] davranisina ek olarak
+// secim modunu da sifirlar — pEkle'nin kendi kapat dugmesindeki desenle ayni
+document.querySelector('#pListe [data-kapat]').onclick = () => {
+  panelKapat();
+  listeSecimModunuKapat();
+};
+
+document.getElementById('lTopluGrupUygula').onclick = async () => {
+  const grup = document.getElementById('lTopluGrup').value.trim();
+  if (!grup) { bildir('Grup adı gir'); return; }
+  if (!listeSecili.size) { bildir('Önce kelime seç'); return; }
+
+  const secilenKelimeler = KELIMELER.filter(k => listeSecili.has(k.id));
+  if (!secilenKelimeler.length) { bildir('Seçili kelime bulunamadı'); return; }
+
+  const repoKelimeler = secilenKelimeler.filter(k => !ozelMi(k.id));
+  if (repoKelimeler.length && !GH_TOKEN) {
+    bildir('Repo kelimelerini güncellemek için önce Ayarlar\'dan GitHub token gir');
+    return;
+  }
+
+  if (!confirm(secilenKelimeler.length + ' kelimeye "' + grup + '" grubu atanacak. Onaylıyor musun?')) return;
+
+  const btn = document.getElementById('lTopluGrupUygula');
+  const eskiMetin = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Uygulanıyor...';
+
+  try {
+    // yerel (OZEL) kelimeler dogrudan guncellenir
+    const ozelKelimeler = secilenKelimeler.filter(k => ozelMi(k.id));
+    for (const k of ozelKelimeler) {
+      const idx = OZEL.findIndex(x => x.id === k.id);
+      if (idx !== -1) OZEL[idx] = Object.assign({}, OZEL[idx], { grup });
+    }
+    if (ozelKelimeler.length) yaz(K_OZEL, OZEL);
+
+    // repo kelimeleri tek commit ile guncellenir — kelime basina ayri commit yok
+    if (repoKelimeler.length) {
+      await ghKelimeleriTopluGuncelle(repoKelimeler.map(k => k.id), grup);
+    }
+
+    const idSeti = new Set(secilenKelimeler.map(k => k.id));
+    KELIMELER = KELIMELER.map(k => idSeti.has(k.id) ? Object.assign({}, k, { grup }) : k);
+
+    bildir(secilenKelimeler.length + ' kelimeye grup atandı');
+    document.getElementById('lTopluGrup').value = '';
+    listeSecimModunuKapat();
+    kuyrukKur();
+    listeCiz();
+  } catch (h) {
+    bildir('Grup atanamadı: ' + (h.message || 'bilinmeyen hata'));
+  } finally {
+    btn.disabled = false; btn.textContent = eskiMetin;
+  }
+};
 
 /* ---------- istatistik ---------- */
 

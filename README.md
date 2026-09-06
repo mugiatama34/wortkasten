@@ -104,8 +104,18 @@ denir ve sıradaki tekrarın ne zaman olduğu gösterilir. Grup seçimi kalıcı
 değildir, uygulamayı kapatıp açtığında tüm kelimelere döner.
 
 Fotoğraftan kelime eklerken, fotoğraf seçildikten hemen sonra bir grup adı
-sorulur (daha önce kullanılmış adlar önerilir). O fotoğraftan çıkan ve
-onayladığın tüm kelimeler bu grupla kaydedilir.
+sorulur (daha önce kullanılmış adlar önerilir). O fotoğraftan çıkan her
+adayın grubu onay ekranında ayrıca görünür ve gerekirse tek tek
+düzeltilebilir. Aynı ünitenin birden fazla sayfasını art arda eklemek
+istersen, sonuçlar geldikten sonra "Fotoğraf seç" ile bir sonraki
+fotoğrafı seçebilirsin — önceki adaylar kaybolmaz, yeni gelenler onlara
+eklenir ve grup kutusu önceki adla önceden doldurulur.
+
+Kelimeler ekranındaki "Seç" düğmesi çoklu seçim modunu açar: her satırda
+işaret kutusu çıkar, "Tümünü seç" o an ekranda görünen (arama/filtre
+uygulanmış) kelimeleri seçer. Seçtiklerine tek seferde bir grup
+atayabilirsin — mevcut gruplardan seçip ya da yeni bir ad yazıp
+"Grup ata"ya basmadan önce kaç kelimenin etkileneceği sorulur.
 
 ## Oyunlar
 
