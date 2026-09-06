@@ -66,7 +66,9 @@ Her kelime 2 kart üretir, örnek cümle varsa 3:
 
 1. **Almanca → Türkçe** — tanıma
 2. **Türkçe → Almanca** — üretim; isimlerde artikel de sorulur
-3. **Cümledeki boşluk** — bağlam içinde kullanım
+3. **Cümledeki boşluk** — bağlam içinde kullanım. Ayarlar'dan "yazarak cevap"
+   açılırsa boşluğu klavyeyle yazarsın, cevap otomatik değerlendirilir
+   (bkz. "Ayarlar").
 
 ## Tekrar algoritması
 
@@ -102,3 +104,10 @@ Ayda bir al.
 Günlük yeni kelime sınırı varsayılan 10. Her kelime 2–3 kart demek, ve
 bugün eklediğin kelimeler önümüzdeki haftalarda tekrar yükü olarak geri
 gelir. Sınırı yükseltmeden önce Menü → İstatistik'ten mevcut yüke bak.
+
+"Cümle kartlarında cevabı yazarak gir" varsayılan kapalı. Açarsan cümle
+kartındaki boşluğa gelen kelimeyi klavyeyle yazarsın; büyük/küçük harf ve
+`ae`/`oe`/`ue`/`ss` gibi umlaut yazımları doğru sayılır. Tam doğruysa dört
+puanlama düğmesi de çıkar, tek karakterlik bir yazım farkı varsa kart
+otomatik "Zor", tamamen yanlışsa otomatik "Tekrar" olarak puanlanır — her
+durumda doğru yazım gösterilir. Diğer iki kart türünü etkilemez.

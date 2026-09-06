@@ -85,6 +85,10 @@ main{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;padding:18
   display:inline-block;min-width:80px;border-bottom:2px solid var(--sonuk);
   vertical-align:baseline;
 }
+.yazi-sonuc{font-size:.92rem;font-weight:600;text-align:center}
+.yazi-sonuc.yazi-dogru{color:var(--iyi)}
+.yazi-sonuc.yazi-yakin{color:var(--uyari)}
+.yazi-sonuc.yazi-yanlis{color:var(--die)}
 
 /* ---------- alt butonlar ---------- */
 footer{flex:0 0 auto;padding:10px 12px 16px;border-top:1px solid var(--cizgi)}
@@ -100,6 +104,9 @@ footer{flex:0 0 auto;padding:10px 12px 16px;border-top:1px solid var(--cizgi)}
 .puan b{font-size:.92rem;font-weight:600}
 .puan span{font-size:.72rem;color:var(--sonuk);font-variant-numeric:tabular-nums}
 .p0 b{color:var(--die)} .p3 b{color:var(--das)}
+.yazi-giris{display:flex;gap:8px}
+.yazi-giris input{flex:1}
+.yazi-giris button{width:auto;padding:15px 18px;flex:0 0 auto}
 
 /* ---------- bos / bilgi durumlari ---------- */
 .durum{
@@ -192,6 +199,8 @@ button:disabled{opacity:.55;cursor:default}
 .test-ikon{flex:0 0 auto;font-weight:700}
 .test-ok .test-ikon{color:var(--iyi)}
 .test-hata .test-ikon{color:var(--die)}
+.ayar-onay{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:.92rem;color:var(--metin)}
+.ayar-onay input{width:auto}
 .geri-al-btn{
   display:block;width:100%;padding:8px;margin-bottom:8px;
   font-size:.82rem;color:var(--sonuk);text-align:center;
@@ -368,6 +377,13 @@ button:disabled{opacity:.55;cursor:default}
       girer — kelime listen küçükken uygundur, büyüdükçe bir sınır koymak işe yarar.
     </p>
     <div class="ayirac"></div>
+    <label class="ayar-onay"><input id="aCumleYazarak" type="checkbox"> Cümle kartlarında cevabı yazarak gir</label>
+    <p class="yardim">
+      Açıkken cümle kartındaki boşluğa gelen kelimeyi klavyeyle kendin yazarsın;
+      cevap otomatik değerlendirilir. Sadece cümle kartlarını etkiler, Almanca → Türkçe
+      ve Türkçe → Almanca kartları değişmez.
+    </p>
+    <div class="ayirac"></div>
     <label>Anthropic API anahtarı <span style="opacity:.7">— yapay zekâ ile cümle önerisi için, isteğe bağlı</span>
       <div class="satir-flex">
         <input id="aApiAnahtar" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
@@ -433,12 +449,12 @@ const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v16';
+const SURUM = 'wortkasten-v17';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
 let ILERLEME = {};    // kartId -> durum
-let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0 };
+let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0, cumleYazarak: false };
 let API_ANAHTARI = '';  // Anthropic API anahtari, sadece bu cihazda
 let GH_TOKEN = '';      // GitHub token, sadece bu cihazda
 let BEKLEYEN = [];      // GH_TOKEN varsa: repoya henuz yazilamamis kelimeler
@@ -448,6 +464,7 @@ let kuyruk = [];
 let aktif = null;
 let acik = false;     // cevap gorunuyor mu
 let sonGeriAl = null;  // son puanlamayi geri almak icin — sadece bir adim
+let yaziliSonuc = null;  // cumle kartinda yazarak cevap modu: son degerlendirme sonucu
 let duzenlenenId = null;  // kelime ekleme formu duzenleme modundaysa duzenlenen kelimenin id'si
 let fotoAdaylar = [];  // fotograftan cikarilan, onay bekleyen kelime adaylari
 
@@ -686,6 +703,7 @@ function ciz() {
 
   aktif = kuyruk[0];
   acik = false;
+  yaziliSonuc = null;
   kartCiz();
 }
 
@@ -721,6 +739,7 @@ function kartCiz() {
         ${acik ? cumleDolu : cumleBos}
         ${k.cumle_tr ? `<span class="cevirisi">${kac(k.cumle_tr)}</span>` : ''}
       </div>`;
+    if (yaziliSonuc) govde += yaziliSonucGovdesi(yaziliSonuc);
     if (acik) {
       govde += `<div class="ayirac"></div>
         <div class="ek-bilgi">${kac(temelBicim(k))} — ${kac(k.tr)}</div>`;
@@ -773,6 +792,71 @@ function ornekKutu(k) {
   return `<div class="ornek">${dolu}${k.cumle_tr ? `<span class="cevirisi">${kac(k.cumle_tr)}</span>` : ''}</div>`;
 }
 
+/* ---------- cumle kartinda yazarak cevap modu ---------- */
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let onceki = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const gecici = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? onceki : 1 + Math.min(onceki, dp[j], dp[j - 1]);
+      onceki = gecici;
+    }
+  }
+  return dp[n];
+}
+
+function karsilastirmaBicimi(s) {
+  return String(s == null ? '' : s).trim().toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
+}
+
+function yazarakModuAktifMi() {
+  return !!(aktif && aktif.yon === 'cumle' && AYAR.cumleYazarak);
+}
+
+function yaziliSonucGovdesi(sonuc) {
+  const mesaj = { dogru: 'Doğru!', yakin: 'Neredeyse doğru', yanlis: 'Yanlış' }[sonuc.tur];
+  return `<div class="yazi-sonuc yazi-${sonuc.tur}">${mesaj}</div>`;
+}
+
+function cevapDegerlendir(girisMetni) {
+  const k = aktif.k;
+  const parca = k.cumle.split(/\{\{(.+?)\}\}/);
+  const dogruCevap = parca[1] || '';
+  const mesafe = levenshtein(karsilastirmaBicimi(girisMetni), karsilastirmaBicimi(dogruCevap));
+
+  let tur, otomatikPuan;
+  if (mesafe === 0) { tur = 'dogru'; otomatikPuan = null; }
+  else if (mesafe === 1) { tur = 'yakin'; otomatikPuan = 1; }
+  else { tur = 'yanlis'; otomatikPuan = 0; }
+
+  yaziliSonuc = { tur, otomatikPuan };
+  acik = true;
+  kartCiz();
+}
+
+function yaziGirisCiz() {
+  alt.innerHTML = geriAlBtn() + `
+    <div class="yazi-giris">
+      <input id="cevapGiris" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Boşluğa gelen kelimeyi yaz">
+      <button class="birincil" id="cevapGonderBtn">Gönder</button>
+    </div>`;
+  geriAlBagla();
+  const giris = document.getElementById('cevapGiris');
+  const gonder = () => cevapDegerlendir(giris.value);
+  document.getElementById('cevapGonderBtn').onclick = gonder;
+  giris.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); gonder(); }
+  });
+  giris.focus();
+}
+
 function geriAlBtn() {
   return sonGeriAl ? `<button class="geri-al-btn" id="geriAlBtn">↺ Son cevabı geri al</button>` : '';
 }
@@ -782,8 +866,15 @@ function geriAlBagla() {
 
 function altCiz() {
   if (!acik) {
+    if (yazarakModuAktifMi()) { yaziGirisCiz(); return; }
     alt.innerHTML = geriAlBtn() + `<button class="goster-btn" id="gosterBtn">Cevabı göster</button>`;
     document.getElementById('gosterBtn').onclick = () => { acik = true; kartCiz(); };
+    geriAlBagla();
+    return;
+  }
+  if (yaziliSonuc && yaziliSonuc.otomatikPuan !== null) {
+    alt.innerHTML = geriAlBtn() + `<button class="birincil" id="devamBtn">Devam</button>`;
+    document.getElementById('devamBtn').onclick = () => puanla(yaziliSonuc.otomatikPuan);
     geriAlBagla();
     return;
   }
@@ -905,6 +996,7 @@ function mYedekAltGuncelle() {
 }
 document.getElementById('mAyar').onclick = () => {
   document.getElementById('aYeni').value = AYAR.yeniLimit === null ? '' : AYAR.yeniLimit;
+  document.getElementById('aCumleYazarak').checked = !!AYAR.cumleYazarak;
   document.getElementById('aApiAnahtar').value = API_ANAHTARI;
   document.getElementById('aGhToken').value = GH_TOKEN;
   panelAc('pAyar');
@@ -1932,6 +2024,7 @@ document.getElementById('aKaydet').onclick = () => {
     const v = parseInt(ham, 10);
     AYAR.yeniLimit = isNaN(v) ? 10 : Math.max(0, Math.min(200, v));
   }
+  AYAR.cumleYazarak = document.getElementById('aCumleYazarak').checked;
   yaz(K_AYAR, AYAR);
 
   API_ANAHTARI = document.getElementById('aApiAnahtar').value.trim();
@@ -2018,8 +2111,13 @@ document.addEventListener('keydown', (e) => {
   if (document.querySelector('.panel.acik')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (!aktif) return;
-  if (!acik && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); acik = true; kartCiz(); return; }
-  if (acik && e.key >= '1' && e.key <= '4') { e.preventDefault(); puanla(parseInt(e.key, 10) - 1); }
+  if (!acik && (e.code === 'Space' || e.code === 'Enter')) {
+    if (yazarakModuAktifMi()) return;
+    e.preventDefault(); acik = true; kartCiz(); return;
+  }
+  if (acik && e.key >= '1' && e.key <= '4' && !(yaziliSonuc && yaziliSonuc.otomatikPuan !== null)) {
+    e.preventDefault(); puanla(parseInt(e.key, 10) - 1);
+  }
 });
 
 /* ==========================================================
