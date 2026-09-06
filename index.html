@@ -209,6 +209,16 @@ button:disabled{opacity:.55;cursor:default}
 .test-hata .test-ikon{color:var(--die)}
 .ayar-onay{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:.92rem;color:var(--metin)}
 .ayar-onay input{width:auto}
+.oyun-ust{display:flex;justify-content:space-between;font-size:.85rem;color:var(--sonuk)}
+.oyun-artikel-kelime{font-size:2rem;font-weight:600;text-align:center;padding:34px 0}
+.oyun-artikel-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.oyun-artikel-btns button{padding:18px 8px;border-radius:var(--r);font-weight:700;font-size:1.1rem}
+.oyun-cevap-alan{
+  min-height:56px;padding:13px 15px;border:1px dashed var(--cizgi);border-radius:var(--r);
+  font-size:1.05rem;line-height:1.5;
+}
+.oyun-tokenler{display:flex;flex-wrap:wrap;gap:8px}
+.oyun-token{padding:10px 14px;border-radius:10px;background:var(--yuzey2);border:1px solid var(--cizgi);font-size:1rem}
 .geri-al-btn{
   display:block;width:100%;padding:8px;margin-bottom:8px;
   font-size:.82rem;color:var(--sonuk);text-align:center;
@@ -250,6 +260,7 @@ button:disabled{opacity:.55;cursor:default}
       <button id="mFoto">Fotoğraftan ekle<small>Kamera veya galeriden Almanca kelime çıkar</small></button>
       <button id="mListe">Kelimeler<small>Tüm kelimeleri gör, düzenle</small></button>
       <button id="mGrupCalis">Gruba göre çalış<small>Sadece seçili grubun kartlarını kuyruğa al</small></button>
+      <button id="mOyunlar">Oyunlar<small>Kelime bilgini ölç — tekrar geçmişine dokunmaz</small></button>
       <button id="mIst">İstatistik<small>Kart sayıları ve ilerleme durumu</small></button>
       <button id="mYedek">Yedekle ve aktar<small id="mYedekAlt">Kelimeleri ve ilerlemeyi dışa/içe aktar</small></button>
       <button id="mAyar">Ayarlar<small>Günlük yeni kelime sınırı</small></button>
@@ -283,6 +294,32 @@ button:disabled{opacity:.55;cursor:default}
     </p>
     <div id="grupCalisListe" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
+</div>
+
+<!-- ==================== OYUNLAR ==================== -->
+<div class="panel" id="pOyunlar">
+  <div class="panel-bas"><h2>Oyunlar</h2><button data-kapat="pOyunlar">Kapat</button></div>
+  <div class="panel-icerik">
+    <p class="yardim">
+      Oyunlar bir ölçme katmanı — tekrar geçmişine ve zamanlamaya dokunmaz,
+      ilerleme kayıtların değişmez.
+    </p>
+    <div id="oyunListeIcerik" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ==================== OYUN — KAPSAM SEÇ ==================== -->
+<div class="panel" id="pOyunKapsam">
+  <div class="panel-bas"><h2 id="oyunKapsamBaslik">Kapsam seç</h2><button data-kapat="pOyunKapsam">Kapat</button></div>
+  <div class="panel-icerik">
+    <div id="oyunKapsamListe" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- ==================== OYUN — OYNAMA / SONUÇ ==================== -->
+<div class="panel" id="pOyun">
+  <div class="panel-bas"><h2 id="oyunBaslik"></h2><button data-kapat="pOyun">Kapat</button></div>
+  <div class="panel-icerik" id="oyunIcerik"></div>
 </div>
 
 <!-- ==================== KELİME EKLE / DÜZENLE ==================== -->
@@ -490,7 +527,7 @@ const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v18';
+const SURUM = 'wortkasten-v19';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -1140,6 +1177,277 @@ document.getElementById('grupCikis').onclick = () => {
   kuyrukKur();
   ciz();
   grupCubuguGuncelle();
+};
+
+/* ==========================================================
+   Oyunlar — olcme katmani. ILERLEME'ye hic dokunmaz, GRUP_FILTRESI'ni
+   degistirmez; kapsam secimi kendi degiskeninde (OYUN_SECILI) tutulur.
+   ========================================================== */
+const OYUNLAR = {
+  artikel: {
+    ad: 'Artikel Turu',
+    aciklama: 'İsimlerin artikelini (der/die/das) hızlıca tahmin et.',
+    minKelime: 5,
+    gerekMetni: 'Bu oyun için en az 5 isim (artikelli) gerekiyor.',
+    uygunKelimeler: (liste) => liste.filter(k => k.tur === 'isim' && ['der', 'die', 'das'].includes(k.artikel))
+  },
+  cumle: {
+    ad: 'Cümle Dizme',
+    aciklama: 'Örnek cümlelerin kelimelerini doğru sıraya diz.',
+    minKelime: 5,
+    gerekMetni: 'Bu oyun için en az 5 örnek cümleli kelime gerekiyor.',
+    uygunKelimeler: (liste) => liste.filter(k => k.cumle && k.cumle.includes('{{'))
+  }
+};
+
+let OYUN_SECILI = null;   // secili oyunun id'si — kapsam secilirken kullanilir
+let oyunZamanlayici = null;  // artikel turundaki geri bildirim duraklamasi
+let OA = null;  // artikel turu calisma zamani durumu
+let OC = null;  // cumle dizme calisma zamani durumu
+
+function oyunListesiCiz() {
+  const el = document.getElementById('oyunListeIcerik');
+  el.innerHTML = Object.keys(OYUNLAR).map(id => {
+    const o = OYUNLAR[id];
+    return `<button class="liste-satir" data-oyun="${id}">
+      <div class="liste-bas">${kac(o.ad)}</div>
+      <div class="liste-alt">${kac(o.aciklama)}</div>
+    </button>`;
+  }).join('');
+  el.querySelectorAll('[data-oyun]').forEach(b => {
+    b.onclick = () => { OYUN_SECILI = b.dataset.oyun; oyunKapsamListesiCiz(); panelAc('pOyunKapsam'); };
+  });
+}
+document.getElementById('mOyunlar').onclick = () => { oyunListesiCiz(); panelAc('pOyunlar'); };
+
+// oyun kapsami: '' tum kelimeler, '__grupsuz__' grubu olmayanlar, aksi
+// halde bir grup adi. GRUP_FILTRESI'nden bagimsiz, kalici degil.
+function oyunKapsamdakiKelimeler(kapsam) {
+  if (kapsam === '') return KELIMELER;
+  if (kapsam === '__grupsuz__') return KELIMELER.filter(k => !(k.grup || '').trim());
+  return KELIMELER.filter(k => (k.grup || '').trim() === kapsam);
+}
+
+function oyunKapsamListesiCiz() {
+  const tanim = OYUNLAR[OYUN_SECILI];
+  document.getElementById('oyunKapsamBaslik').textContent = tanim.ad + ' — kapsam';
+  const { sayilar, grupsuz } = grupSayilari();
+  const gruplar = [...sayilar.keys()].sort((a, b) => a.localeCompare(b, 'tr'));
+  const el = document.getElementById('oyunKapsamListe');
+
+  const satirYap = (etiket, kapsam) => {
+    const uygun = tanim.uygunKelimeler(oyunKapsamdakiKelimeler(kapsam));
+    return `<button class="liste-satir" data-kapsam="${kac(kapsam)}">
+      <div class="liste-bas">${kac(etiket)}</div>
+      <div class="liste-alt">${uygun.length} uygun kelime</div>
+    </button>`;
+  };
+
+  let h = satirYap('Tüm kelimeler', '');
+  for (const g of gruplar) h += satirYap(g, g);
+  h += satirYap('Grupsuz', '__grupsuz__');
+  el.innerHTML = h;
+
+  el.querySelectorAll('[data-kapsam]').forEach(b => {
+    b.onclick = () => {
+      const uygun = tanim.uygunKelimeler(oyunKapsamdakiKelimeler(b.dataset.kapsam));
+      if (uygun.length < tanim.minKelime) {
+        bildir(tanim.gerekMetni + ' (bu kapsamda ' + uygun.length + ' var)');
+        return;
+      }
+      panelKapat();
+      oyunBaslat(OYUN_SECILI, uygun);
+    };
+  });
+}
+
+function oyunBaslat(oyunId, kelimeler) {
+  if (oyunId === 'artikel') oyunArtikelBaslat(kelimeler);
+  else if (oyunId === 'cumle') oyunCumleBaslat(kelimeler);
+}
+
+function oyunSureMetni(ms) {
+  const saniye = Math.round(ms / 1000);
+  if (saniye < 60) return saniye + ' sn';
+  return Math.floor(saniye / 60) + ' dk ' + (saniye % 60) + ' sn';
+}
+
+// oyun sonu: skor, (varsa) sure, yanlis yapilan kelimelerin duzenlenebilir listesi
+function oyunSonucCiz(baslik, dogru, toplam, sureMs, yanlislar) {
+  document.getElementById('oyunBaslik').textContent = baslik + ' — Sonuç';
+  let h = `<div class="ist-satir"><span>Doğru</span><b>${dogru} / ${toplam}</b></div>`;
+  if (sureMs !== null) h += `<div class="ist-satir"><span>Süre</span><b>${oyunSureMetni(sureMs)}</b></div>`;
+
+  if (yanlislar.length) {
+    h += `<div class="ist-baslik">Yanlış yapılan kelimeler</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${yanlislar.map((k, i) => {
+          const bas = k.tur === 'isim' && k.artikel ? k.artikel + ' ' + k.de : k.de;
+          return `<button class="liste-satir" data-yanlis-idx="${i}">
+            <div class="liste-bas">${kac(bas)}</div>
+            <div class="liste-alt">${kac(k.tr)}</div>
+          </button>`;
+        }).join('')}
+      </div>`;
+  } else {
+    h += `<p class="yardim">Hiç yanlış yok — tebrikler.</p>`;
+  }
+  h += `<button class="ikincil" id="oyunTekrarBtn">Oyunlara dön</button>`;
+  document.getElementById('oyunIcerik').innerHTML = h;
+
+  document.querySelectorAll('#oyunIcerik [data-yanlis-idx]').forEach(b => {
+    b.onclick = () => {
+      const k = yanlislar[parseInt(b.dataset.yanlisIdx, 10)];
+      formuDoldur(k);
+      panelAc('pEkle');
+    };
+  });
+  document.getElementById('oyunTekrarBtn').onclick = () => { oyunListesiCiz(); panelAc('pOyunlar'); };
+}
+
+/* ---------- Oyun 1: Artikel Turu ---------- */
+function oyunArtikelBaslat(kelimeler) {
+  const tur = karistir(kelimeler.slice()).slice(0, 20);
+  OA = { kelimeler: tur, index: 0, dogru: 0, yanlislar: [], baslangic: Date.now(), kilit: false };
+  document.getElementById('oyunBaslik').textContent = 'Artikel Turu';
+  panelAc('pOyun');
+  oyunArtikelCiz();
+}
+
+function oyunArtikelCiz() {
+  const { kelimeler, index, dogru } = OA;
+  const k = kelimeler[index];
+  OA.kilit = false;
+  document.getElementById('oyunIcerik').innerHTML = `
+    <div class="oyun-ust"><span>${index + 1} / ${kelimeler.length}</span><span>Doğru: ${dogru}</span></div>
+    <div class="oyun-artikel-kelime">${kac(k.de)}</div>
+    <div id="oyunArtikelGeriBildirim"></div>
+    <div class="oyun-artikel-btns">
+      <button class="a-der" data-artikel="der">der</button>
+      <button class="a-die" data-artikel="die">die</button>
+      <button class="a-das" data-artikel="das">das</button>
+    </div>`;
+  document.querySelectorAll('#oyunIcerik [data-artikel]').forEach(b => {
+    b.onclick = () => oyunArtikelCevapla(b.dataset.artikel);
+  });
+}
+
+function oyunArtikelCevapla(secilen) {
+  if (OA.kilit) return;
+  OA.kilit = true;
+  const k = OA.kelimeler[OA.index];
+  const dogruMu = secilen === k.artikel;
+  document.querySelectorAll('#oyunIcerik [data-artikel]').forEach(b => b.disabled = true);
+
+  const geri = document.getElementById('oyunArtikelGeriBildirim');
+  if (dogruMu) {
+    OA.dogru++;
+    geri.innerHTML = `<div class="artikel-bant a-${kac(k.artikel)}"><span>${kac(k.artikel)}</span><span>Doğru!</span></div>`;
+  } else {
+    OA.yanlislar.push(k);
+    geri.innerHTML = `<div class="artikel-bant a-${kac(k.artikel)}"><span>${kac(k.artikel)}</span><span>${kac(k.de)}</span></div>`;
+  }
+
+  clearTimeout(oyunZamanlayici);
+  oyunZamanlayici = setTimeout(() => {
+    OA.index++;
+    if (OA.index >= OA.kelimeler.length) oyunArtikelBitir();
+    else oyunArtikelCiz();
+  }, dogruMu ? 550 : 1300);
+}
+
+function oyunArtikelBitir() {
+  const sure = Date.now() - OA.baslangic;
+  const dogru = OA.dogru, toplam = OA.kelimeler.length, yanlislar = OA.yanlislar;
+  OA = null;
+  oyunSonucCiz('Artikel Turu', dogru, toplam, sure, yanlislar);
+}
+
+/* ---------- Oyun 2: Cümle Dizme ---------- */
+// {{ }} isaretlemesini kaldirip bosluktan boler — noktalama boylece
+// kendinden onceki kelimeye yapisik kalir, ayri bir parca olmaz.
+function cumleTokenlari(kelime) {
+  return kelime.cumle.replace(/\{\{(.+?)\}\}/g, '$1').trim().split(/\s+/);
+}
+
+function oyunCumleBaslat(kelimeler) {
+  const secilen = karistir(kelimeler.slice()).slice(0, 5);
+  OC = { kelimeler: secilen, index: 0, dogru: 0, yanlislar: [], havuz: [], cevap: [], dogruSira: [] };
+  document.getElementById('oyunBaslik').textContent = 'Cümle Dizme';
+  panelAc('pOyun');
+  oyunCumleYeniTur();
+}
+
+function oyunCumleYeniTur() {
+  const k = OC.kelimeler[OC.index];
+  const dogruSira = cumleTokenlari(k);
+  let karisik;
+  do { karisik = karistir(dogruSira.slice()); }
+  while (karisik.length > 1 && karisik.join(' ') === dogruSira.join(' '));
+
+  OC.dogruSira = dogruSira;
+  OC.havuz = karisik.map((metin, i) => ({ metin, anahtar: i }));
+  OC.cevap = [];
+  oyunCumleCiz();
+}
+
+function oyunCumleCiz() {
+  const { index, kelimeler, dogru, havuz, cevap } = OC;
+  const cumleMetni = cevap.map(t => t.metin).join(' ');
+  document.getElementById('oyunIcerik').innerHTML = `
+    <div class="oyun-ust"><span>${index + 1} / ${kelimeler.length}</span><span>Doğru: ${dogru}</span></div>
+    <div class="oyun-cevap-alan">${cumleMetni ? kac(cumleMetni) : '<span class="ipucu">Kelimelere dokunarak cümleyi oluştur</span>'}</div>
+    <div class="oyun-tokenler">
+      ${havuz.map(t => `<button class="oyun-token" data-anahtar="${t.anahtar}">${kac(t.metin)}</button>`).join('')}
+    </div>
+    ${cevap.length ? '<button class="geri-al-btn" id="oyunCumleGeriAl">↺ Son kelimeyi geri al</button>' : ''}
+    <button class="birincil" id="oyunCumleKontrol"${havuz.length ? ' disabled' : ''}>Kontrol et</button>`;
+
+  document.querySelectorAll('#oyunIcerik [data-anahtar]').forEach(b => {
+    b.onclick = () => {
+      const anahtar = parseInt(b.dataset.anahtar, 10);
+      const i = OC.havuz.findIndex(t => t.anahtar === anahtar);
+      if (i === -1) return;
+      OC.cevap.push(OC.havuz.splice(i, 1)[0]);
+      oyunCumleCiz();
+    };
+  });
+  const geriBtn = document.getElementById('oyunCumleGeriAl');
+  if (geriBtn) geriBtn.onclick = () => { OC.havuz.push(OC.cevap.pop()); oyunCumleCiz(); };
+  document.getElementById('oyunCumleKontrol').onclick = oyunCumleKontrolEt;
+}
+
+function oyunCumleKontrolEt() {
+  if (OC.havuz.length) return;
+  const k = OC.kelimeler[OC.index];
+  const verilenSira = OC.cevap.map(t => t.metin).join(' ');
+  const dogruMu = verilenSira === OC.dogruSira.join(' ');
+  if (dogruMu) OC.dogru++; else OC.yanlislar.push(k);
+
+  const sonMu = OC.index >= OC.kelimeler.length - 1;
+  document.getElementById('oyunIcerik').innerHTML = `
+    <div class="oyun-ust"><span>${OC.index + 1} / ${OC.kelimeler.length}</span><span>Doğru: ${OC.dogru}</span></div>
+    <div class="yazi-sonuc ${dogruMu ? 'yazi-dogru' : 'yazi-yanlis'}">${dogruMu ? 'Doğru!' : 'Yanlış'}</div>
+    ${dogruMu ? '' : `<div class="oyun-cevap-alan">${kac(OC.dogruSira.join(' '))}</div>`}
+    <button class="birincil" id="oyunCumleDevam">${sonMu ? 'Bitir' : 'Sonraki cümle'}</button>`;
+  document.getElementById('oyunCumleDevam').onclick = () => {
+    if (sonMu) oyunCumleBitir();
+    else { OC.index++; oyunCumleYeniTur(); }
+  };
+}
+
+function oyunCumleBitir() {
+  const dogru = OC.dogru, toplam = OC.kelimeler.length, yanlislar = OC.yanlislar;
+  OC = null;
+  oyunSonucCiz('Cümle Dizme', dogru, toplam, null, yanlislar);
+}
+
+// pOyun kapatilirken artikel turunun bekleyen geri bildirim zamanlayicisini
+// iptal et — aksi halde panel kapandiktan sonra bile gizli DOM'a yazmaya devam eder
+document.querySelector('#pOyun [data-kapat]').onclick = () => {
+  clearTimeout(oyunZamanlayici);
+  OA = null; OC = null;
+  panelKapat();
 };
 
 function mYedekAltGuncelle() {
