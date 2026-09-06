@@ -127,19 +127,60 @@ akışında `grup` alanı bir `<datalist>`'e bağlı; `grupOnerileriDoldur()`
 mevcut kelimelerdeki tüm grup adlarını toplayıp öneri listesine koyar. Yeni
 bir ad da serbestçe yazılabilir.
 
-**Fotoğraftan eklerken tek grup soru.** Fotoğraf seçildikten hemen sonra,
-işlemeye başlamadan önce (`fotoDosya` `onchange`) grup adı sorulur —
-`fotoGrupSor` bloğu görünür olur, dosya `fotoSeciliDosya`'da bekler. "Devam"
-(`fotoGrupDevam` → `fotoIslemeBasla()`) tıklanınca girilen ad
-`fotoPartiGrubu`'na yazılır ve o andan itibaren asıl API isteği başlar. O
-partide çıkan, kullanıcının onayladığı tüm kelimelere aynı `fotoPartiGrubu`
-uygulanır — onay ekranında kelime başına ayrı bir grup alanı yok, bilinçli
-olarak: amaç bir sayfayı tek ünite olarak eklemek.
+**Fotoğraftan eklerken grup soru — kelime başına, aday üretilirken atanır.**
+Fotoğraf seçildikten hemen sonra, işlemeye başlamadan önce (`fotoDosya`
+`onchange`) grup adı sorulur — `fotoGrupSor` bloğu görünür olur, dosya
+`fotoSeciliDosya`'da bekler. `fotoGrupSor` `class="gizli foto-grup-sor"`
+kullanır; layout'u (`display:flex` vb.) satır içi `style` yerine
+`.foto-grup-sor` kuralına koy ve bu kuralı CSS'te **`.gizli`'den önce**
+tanımla — aksi halde inline `style` her zaman kazanır ve `.gizli` toggle'i
+işe yaramaz (bu, gerçek bir hataydı: panel açılır açılmaz grup kutusu
+fotoğraf seçilmeden görünüyordu). Aynı desen `.secim-alan` için de geçerli.
+
+"Devam" (`fotoGrupDevam` → `fotoIslemeBasla()`) tıklanınca girilen ad
+`fotoPartiGrubu`'na yazılır. API'den dönen her aday, o anki `fotoPartiGrubu`
+değeriyle etiketlenip (`grup` alanı) mevcut `fotoAdaylar` dizisine
+**eklenir** — dizi sıfırlanmaz. Bu, "Fotoğraf seç" düğmesinin işlem
+bitince tekrar görünür olmasıyla birleşince aynı onay ekranına birden
+fazla fotoğraf (aynı ünitenin sonraki sayfaları) eklenebilmesini sağlar;
+her fotoğraf turu için grup kutusu bir önceki `fotoPartiGrubu` ile
+önceden doldurulur, kullanıcı aynı adı yeniden yazmak zorunda kalmaz ama
+isterse değiştirebilir.
+
+Onay ekranında **her satırda ayrı, düzenlenebilir bir grup alanı vardır**
+(`fo-grup-<i>`, `grupOnerilerFoto` datalist'ine bağlı) — kullanıcı
+eklemeden önce doğrulayabilir ya da düzeltebilir. "Seçilenleri ekle"
+(`fotoEkleBtn`) her satırın grubunu **o satırın kendi alanından** okur;
+hangi yoldan geldiğine bakılmaksızın (tam yanıt, `diziKismiKurtar()` ile
+kısmi kurtarma, ya da ikinci bir fotoğraftan gelen ek aday) sonuç aynıdır.
+Alan boş bırakılırsa o kelimeye `grup` hiç yazılmaz.
 
 **Kelime listesi ekranı.** Arama kutusunun yanındaki `lGrupFiltre`
 açılır menüsü her grubu (ve "Grupsuz"u) içerdiği kelime sayısıyla listeler
 (`lGrupFiltreDoldur()`), seçim `listeCiz()`'i filtreler. Kalıcı değil,
 panel her açıldığında yeniden kurulur.
+
+**Toplu grup atama.** Kelimeler panelindeki "Seç" düğmesi (`lSecModu`)
+çoklu seçim moduna girer (`listeSecimModu`); `listeCiz()` bu moddayken
+satırları düğme yerine işaret kutulu `<label>` olarak çizer, satıra
+dokunmak `formuDoldur()` açmaz, sadece kutuyu değiştirir. "Tümünü seç"
+(`lTumunuSec`) sadece **o an ekranda görünen** (arama/grup filtresi
+uygulanmış) kelimeleri seçer/kaldırır — `listeSonGosterilenIdler`,
+`listeCiz()`'in her çiziminde güncellenir. Seçim (`listeSecili`, bir Set)
+filtre değiştiğinde temizlenmez — kullanıcı farklı aramalarla seçimi
+biriktirebilir; panel kapanınca (`listeSecimModunuKapat()`) sıfırlanır.
+
+Grup adı `lTopluGrup` alanına (mevcut gruplardan `grupOnerilerToplu`
+datalist'i ile ya da serbest yazarak) girilir, "Grup ata" öncesi
+`confirm()` ile **kaç kelimenin etkileneceği söylenip onay istenir**.
+Uygulama iki parçaya ayrılır: `OZEL` kaynaklı kelimeler doğrudan
+güncellenir (`ozelMi()`); repodan gelenler `ghKelimeleriTopluGuncelle()`
+ile **tek bir `PUT`/tek commit** olarak yazılır — `ghKelimeGuncelle()`'nin
+tekil hali gibi ama `ghKelimelerYazGovde()`'ye id kümesiyle eşleşen tüm
+kayıtları aynı anda güncelleyen bir dönüştürücü verir, kelime başına ayrı
+commit atmaz. Seçilenler arasında repo kelimesi varsa ve `GH_TOKEN` yoksa
+işlem hiç başlamaz, tek diğer düzenleme akışlarındaki gibi önce token
+istenir.
 
 **Çalışma ekranı — "Gruba göre çalış".** `GRUP_FILTRESI` değişkeni
 çalışma kuyruğunu daraltan tek durum: `null` tüm kelimeler, `''` sadece
