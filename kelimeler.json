@@ -484,6 +484,14 @@
       "tr": "okunabilir",
       "cumle": "Der Text auf dem Handy ist kaum {{lesbar}}.",
       "cumle_tr": "Telefondaki metin neredeyse okunamıyor."
+    },
+    {
+      "id": "umtpjrcmy0",
+      "tur": "diger",
+      "de": "jemanden duzen",
+      "tr": "Birine du demek",
+      "cumle": "Ich würde eine neue Kollegin oder einen neuen Kollegen niemals ungefragt {{duzen}}",
+      "cumle_tr": ""
     }
   ]
 }
