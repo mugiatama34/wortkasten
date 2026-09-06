@@ -49,6 +49,7 @@ yapamaz hale getirmiş olursun.
   "artikel": "das",
   "cogul": "Werkzeuge",
   "tr": "alet, takım",
+  "grup": "Ünite 3",
   "cumle": "Das {{Werkzeug}} liegt auf dem Tisch.",
   "cumle_tr": "Alet masanın üstünde duruyor.",
   "etiket": ["teknik"]
@@ -58,6 +59,8 @@ yapamaz hale getirmiş olursun.
 - `tur`: `isim` · `fiil` · `sifat` · `diger`
 - `artikel`, `cogul` sadece isimlerde; `formlar` sadece fiillerde
 - `cumle` isteğe bağlı; `{{ }}` içindeki kelime boşluğa dönüşür
+- `grup` isteğe bağlı, ünite/grup adı. Yoksa alan hiç yazılmaz — bkz.
+  "Kelime grupları"
 
 **`id` alanları asla değiştirilmez.** Tekrar geçmişi `localStorage`'da
 `<id>:de-tr` gibi anahtarlarla tutuluyor. Bir `id` değişirse o kelimenin
@@ -111,6 +114,54 @@ Kolaylık faktörü 1,3 ile 3,0 arasında sınırlı. Kısa aralıklarda
 yuvarlama yüzünden aralığın büyümeyip takılması daha önce yaşanmış bir
 hataydı; "Zor" dalında `Math.max(aralik + 1, ...)` bunun için var,
 kaldırma.
+
+## Kelime grupları (üniteler)
+
+Kelime kaydındaki isteğe bağlı `grup` alanı serbest metin — ünite adı gibi
+düşün. Grubu olmayan kelimeler arayüzde "Grupsuz" görünür, ama JSON'a boş
+`grup` alanı yazılmaz; alan ya vardır ya da hiç yoktur (`formdanKelimeOku()`
+ve `fotoEkleBtn` akışı bunu böyle üretir).
+
+**Grup adı önerileri.** Kelime ekleme formunda ve fotoğraftan ekleme
+akışında `grup` alanı bir `<datalist>`'e bağlı; `grupOnerileriDoldur()`
+mevcut kelimelerdeki tüm grup adlarını toplayıp öneri listesine koyar. Yeni
+bir ad da serbestçe yazılabilir.
+
+**Fotoğraftan eklerken tek grup soru.** Fotoğraf seçildikten hemen sonra,
+işlemeye başlamadan önce (`fotoDosya` `onchange`) grup adı sorulur —
+`fotoGrupSor` bloğu görünür olur, dosya `fotoSeciliDosya`'da bekler. "Devam"
+(`fotoGrupDevam` → `fotoIslemeBasla()`) tıklanınca girilen ad
+`fotoPartiGrubu`'na yazılır ve o andan itibaren asıl API isteği başlar. O
+partide çıkan, kullanıcının onayladığı tüm kelimelere aynı `fotoPartiGrubu`
+uygulanır — onay ekranında kelime başına ayrı bir grup alanı yok, bilinçli
+olarak: amaç bir sayfayı tek ünite olarak eklemek.
+
+**Kelime listesi ekranı.** Arama kutusunun yanındaki `lGrupFiltre`
+açılır menüsü her grubu (ve "Grupsuz"u) içerdiği kelime sayısıyla listeler
+(`lGrupFiltreDoldur()`), seçim `listeCiz()`'i filtreler. Kalıcı değil,
+panel her açıldığında yeniden kurulur.
+
+**Çalışma ekranı — "Gruba göre çalış".** `GRUP_FILTRESI` değişkeni
+çalışma kuyruğunu daraltan tek durum: `null` tüm kelimeler, `''` sadece
+grubu olmayanlar, aksi halde bir grup adı. **Bilinçli olarak
+`localStorage`'a yazılmaz** — uygulama her açıldığında `null`'a döner,
+grup çalışması kalıcı bir mod değil geçici bir odaklanmadır (bkz. görev
+tanımı). `kuyrukKur()` içinde `kartlar()` sonucu `kartGrupUyumluMu()` ile
+filtrelenir; bu filtre **sadece hangi kartların uygun olduğunu belirler,
+zamanlamayı değiştirmez** — `planla()`'nın ürettiği `sonraki` zaman damgası
+aynen kullanılır, vakti gelmemiş kartlar öne çekilmez. `enYakinTarih()` ve
+`bosEkran()` de aynı filtreyle çalışıp "bu grupta vakti gelmiş kart yok,
+sıradaki tekrar: ..." mesajını üretir.
+
+Tek istisna, günlük yeni kelime kotası (`AYAR.yeniLimit`, `K_YENISECIM`):
+bu kota grup filtresi aktifken hiç uygulanmaz, o gruptaki tüm yeni
+kelimeler doğrudan kuyruğa girer. Bunun iki nedeni var: kota günün
+başında rastgele seçildiği için grup filtresiyle birlikte hesaplanırsa
+günün geri kalanında kalıcı olarak o gruba daralmış olurdu; ayrıca fotoğraf
+ile az önce eklenen bir ünitenin kelimeleri günün kotası zaten
+doldurulmuşsa hiç görünmezdi — "gruba göre çalış" tam olarak bunu önlemek
+için var. Bu, `planla()`'nın ürettiği aralık/zamanlama mantığına dokunmaz,
+sadece hangi yeni kartların günün kotasından muaf tutulacağına dair.
 
 ## Değişiklik sonrası kontrol listesi
 

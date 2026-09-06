@@ -46,6 +46,7 @@ düzenlenebilir. Kaydettiğin an yayına girer.
   "artikel": "das",
   "cogul": "Werkzeuge",
   "tr": "alet, takım",
+  "grup": "Ünite 3",
   "cumle": "Das {{Werkzeug}} liegt auf dem Tisch.",
   "cumle_tr": "Alet masanın üstünde duruyor.",
   "etiket": ["teknik"]
@@ -59,6 +60,8 @@ düzenlenebilir. Kaydettiğin an yayına girer.
 - `formlar` sadece fiillerde: `"geht, ging, ist gegangen"`
 - `cumle` isteğe bağlı. Yazarsan boşluk doldurma kartı da üretilir.
   Boşluğa dönüşecek kelimeyi `{{ }}` içine al — cümledeki çekimli hâliyle.
+- `grup` isteğe bağlı — ünite/grup adı. Yoksa alan hiç yazılmaz, arayüzde
+  "Grupsuz" gösterilir (bkz. "Kelime grupları").
 
 ## Kart üretimi
 
@@ -87,6 +90,22 @@ arasında tutulur. Mezun bir kartta "Tekrar" dersen aralık %60 kısalır ve kar
 
 Tüm bu mantık `planla()` fonksiyonunda. Birkaç ay veri biriktikten sonra
 FSRS'e geçmek istersen sadece bu fonksiyonu değiştirmen yeterli.
+
+## Kelime grupları
+
+Kelimeye isteğe bağlı bir ünite/grup adı verebilirsin. Menü → Kelimeler
+ekranında arama kutusunun yanındaki açılır menüden gruba göre filtrelenebilir,
+her grubun kaç kelime içerdiği görünür.
+
+Menü → "Gruba göre çalış" ile sadece seçili grubun kartları çalışılır. Bu
+sadece hangi kartların kuyruğa gireceğini belirler, tekrar zamanlamasını
+değiştirmez: seçilen grupta vakti gelmiş kart yoksa "bekleyen kart yok"
+denir ve sıradaki tekrarın ne zaman olduğu gösterilir. Grup seçimi kalıcı
+değildir, uygulamayı kapatıp açtığında tüm kelimelere döner.
+
+Fotoğraftan kelime eklerken, fotoğraf seçildikten hemen sonra bir grup adı
+sorulur (daha önce kullanılmış adlar önerilir). O fotoğraftan çıkan ve
+onayladığın tüm kelimeler bu grupla kaydedilir.
 
 ## Yedekleme
 
