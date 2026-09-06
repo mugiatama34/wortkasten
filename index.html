@@ -219,6 +219,8 @@ button:disabled{opacity:.55;cursor:default}
 }
 .oyun-tokenler{display:flex;flex-wrap:wrap;gap:8px}
 .oyun-token{padding:10px 14px;border-radius:10px;background:var(--yuzey2);border:1px solid var(--cizgi);font-size:1rem}
+.oyun-fark{color:var(--die);font-weight:700;text-decoration:underline;text-decoration-style:wavy}
+.oyun-cumle-tr{font-size:.9rem;color:var(--sonuk);margin-top:6px}
 .geri-al-btn{
   display:block;width:100%;padding:8px;margin-bottom:8px;
   font-size:.82rem;color:var(--sonuk);text-align:center;
@@ -527,7 +529,7 @@ const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v19';
+const SURUM = 'wortkasten-v20';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -1420,15 +1422,24 @@ function oyunCumleCiz() {
 function oyunCumleKontrolEt() {
   if (OC.havuz.length) return;
   const k = OC.kelimeler[OC.index];
-  const verilenSira = OC.cevap.map(t => t.metin).join(' ');
-  const dogruMu = verilenSira === OC.dogruSira.join(' ');
+  const verilenTokenler = OC.cevap.map(t => t.metin);
+  const dogruMu = verilenTokenler.join(' ') === OC.dogruSira.join(' ');
   if (dogruMu) OC.dogru++; else OC.yanlislar.push(k);
+
+  let dogruCumleH = '';
+  if (!dogruMu) {
+    const vurgulu = OC.dogruSira
+      .map((kelime, i) => kelime === verilenTokenler[i] ? kac(kelime) : `<span class="oyun-fark">${kac(kelime)}</span>`)
+      .join(' ');
+    dogruCumleH = `<div class="oyun-cevap-alan">${vurgulu}</div>`;
+    if (k.cumle_tr) dogruCumleH += `<div class="oyun-cumle-tr">${kac(k.cumle_tr)}</div>`;
+  }
 
   const sonMu = OC.index >= OC.kelimeler.length - 1;
   document.getElementById('oyunIcerik').innerHTML = `
     <div class="oyun-ust"><span>${OC.index + 1} / ${OC.kelimeler.length}</span><span>Doğru: ${OC.dogru}</span></div>
     <div class="yazi-sonuc ${dogruMu ? 'yazi-dogru' : 'yazi-yanlis'}">${dogruMu ? 'Doğru!' : 'Yanlış'}</div>
-    ${dogruMu ? '' : `<div class="oyun-cevap-alan">${kac(OC.dogruSira.join(' '))}</div>`}
+    ${dogruCumleH}
     <button class="birincil" id="oyunCumleDevam">${sonMu ? 'Bitir' : 'Sonraki cümle'}</button>`;
   document.getElementById('oyunCumleDevam').onclick = () => {
     if (sonMu) oyunCumleBitir();

@@ -198,7 +198,11 @@ başlamaz, `gerekMetni` ile kaç kelime gerektiği açıkça söylenir.
   5 gerekir, 5 cümle oynatılır. `cumleTokenlari()` `{{ }}` işaretlemesini
   kaldırıp cümleyi boşluktan böler — noktalama işaretleri böylece kendinden
   önceki kelimeye yapışık kalır, ayrı bir parça olmaz. Karıştırılan sıranın
-  orijinalle aynı çıkmaması için `do...while` ile tekrar karıştırılır.
+  orijinalle aynı çıkmaması için `do...while` ile tekrar karıştırılır. Yanlış
+  cevapta doğru cümle tam haliyle gösterilir; kullanıcının o pozisyona
+  koyduğu kelimeyle eşleşmeyen kelimeler `.oyun-fark` sınıfıyla vurgulanır
+  (pozisyon bazlı karşılaştırma — `dogruSira[i] !== verilenTokenler[i]`).
+  Kelimenin `cumle_tr` alanı varsa altında ayrıca gösterilir.
 
 **Sonuç ekranı.** Her iki oyun da aynı `oyunSonucCiz()` fonksiyonunu
 kullanır: doğru sayısı, (Artikel Turu'nda) süre, ve yanlış yapılan
