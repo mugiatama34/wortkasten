@@ -239,6 +239,8 @@ işaretli durur. Ayarlar panelinde değil, fotoğraf ekranında seçilir ama
 Alt sınır isteme `seviyeElemeMetni()` ile işlenir: alt sınırın
 altındaki seviyeleri "A1, A2 ve B1" biçiminde birleştirir, `Tümü`
 seçiliyken boş döner ve istemde sadece özel isim/sayı elemesi kalır.
+`FOTO_MAKS_KELIME` (80) kelimelik üst sınır ve "fazlası varsa en yüksek
+seviyeliler" kuralı alt sınırdan bağımsız geçerlidir.
 
 **Onay ekranındaki seviye filtresi.** `fotoSeviyeFiltreCiz()` o partide
 geçen her seviye için sayılı bir düğme çizer ("B2 (7)"); seviyesi
@@ -386,8 +388,11 @@ Turu'ndaki `oyunZamanlayici` iptaliyle aynı amaç, farklı bir mekanizma).
 Kelime ekleme panelindeki "Cümle öner" düğmesi, girilen Almanca kelime,
 tür ve Türkçe karşılığını Anthropic'in Messages API'sine gönderip örnek
 cümle ve çevirisini önerir. Kullanıcı öneriyi kaydetmeden önce
-düzenleyebilir — otomatik kaydetme yok. Oyunlar bölümündeki Boşluk
-Doldurma ve Hatalı Kelime Avı da aynı API'yi kullanır (`AI_MODEL`,
+düzenleyebilir — otomatik kaydetme yok. Fotoğraftan eklemenin ikinci
+aşaması (`cumlePartisiUret`) aynı kuralları partiler hâlinde uygular,
+`AI_MODEL` ve `AI_CUMLE_PARTI_MAX_TOKENS`'ı kullanır — bkz. "Fotoğraftan
+kelime çıkarma — iki aşama". Oyunlar bölümündeki Boşluk Doldurma ve Hatalı
+Kelime Avı da aynı API'yi kullanır (`AI_MODEL`,
 `AI_BOSLUK_MAX_TOKENS`/`AI_AVCI_MAX_TOKENS`) — ayrıntıları için "Oyunlar"
 bölümüne bak.
 
@@ -405,11 +410,12 @@ bölümüne bak.
 - `sw.js`, `api.anthropic.com` isteklerini önbelleğe almadan doğrudan
   ağa geçirir — bu istekleri cache mantığına dahil etme.
 
-Bu, tamamen otomatik kart üretiminden farklı: model sadece tek bir
-alan çifti (`cumle`, `cumle_tr`) için öneri üretir, kullanıcı onaylayıp
-kaydetmeden hiçbir şey kalıcı olmaz.
+Bu, tamamen otomatik kart üretiminden farklı: model sadece `cumle` /
+`cumle_tr` alan çifti için öneri üretir, kullanıcı onaylayıp kaydetmeden
+hiçbir şey kalıcı olmaz. Fotoğraftan eklemede de cümleler ancak kullanıcı
+kelimeleri seçip "Seçilenleri ekle"ye bastıktan sonra üretilir.
 
-### Fotoğraftan kelime çıkarma
+### Fotoğraftan kelime çıkarma — iki aşama
 
 Menüdeki "Fotoğraftan ekle" girişi, kamera ya da galeriden seçilen bir
 sayfa fotoğrafındaki Almanca kelimeleri görsel destekleyen bir modelle
@@ -417,41 +423,109 @@ sayfa fotoğrafındaki Almanca kelimeleri görsel destekleyen bir modelle
 niteliğinde — kullanıcı onaylayıp "Seçilenleri ekle"ye basmadan hiçbir
 kelime kaydedilmez.
 
+**Akış bilinçli olarak iki aşamaya bölünmüştür.** Daha önce tek çağrıda hem
+kelime çıkarılıp hem cümle üretiliyordu; kelime listesi sayfalarında (70+
+kelime) yanıt `max_tokens`'a takılıp kesiliyordu. Bu bölünmeyi geri alma.
+
+#### Aşama 1 — sadece kelime çıkarma (`gorselKelimeCikar`)
+
+- Fotoğraf isteğinde **cümle istenmez**. Model sadece şu alanları döner:
+  `de`, `tur`, `artikel`, `cogul`, `formlar`, `tr`, `seviye`. İstemde bunu
+  açıkça söyleyen bir satır var ("Örnek cümle üretme, sadece yukarıdaki
+  alanları doldur"), örnek JSON'da da cümle alanları yok.
+- Kayıt başına düşen token bu yüzden çok küçük; kelime sınırı
+  `FOTO_MAKS_KELIME` sabitinde **80**. İstemdeki "en fazla N kelime" ve
+  "fazlası varsa en yüksek seviyeliler" satırları bu sabitten üretilir.
+- `AI_GORSEL_MAX_TOKENS` 8000 kalır. **Kesilme kontrolü ve kısmi kurtarma
+  aynen durur** — `diziYanitiCoz()` `stop_reason === 'max_tokens'` ise
+  `diziKismiKurtar()` ile tam kayıtları toplar, aksi halde tüm diziyi
+  ayrıştırır. Bu yardımcıyı cümle partileri de kullanır.
+- `fotoOgeTemizle()` artık `cumle`/`cumle_tr` alanı üretmez; onay ekranı
+  satırlarında da cümle alanı yoktur (80 satırlık liste kısa kalsın diye).
 - **Görüntü hazırlama:** Gönderilmeden önce canvas ile küçültülür — uzun
   kenar en fazla 1500px, JPEG kalite 0,8. Bu adım hem isteği hem
   maliyeti küçük tutar, telefon fotoğrafları boyut sınırına takılmasın
   diye eklendi.
 - **Model adı** `index.html` başındaki `AI_GORSEL_MODEL` sabitinde,
-  varsayılan `claude-sonnet-5`. `AI_MODEL` (cümle önerisi için) ayrı
-  kalır — görsel anlama gerektirmeyen istekler için daha ucuz/hızlı
-  modeli kullanmaya devam eder.
+  varsayılan `claude-sonnet-5`. `AI_MODEL` (cümle önerisi ve cümle
+  partileri için) ayrı kalır — görsel anlama gerektirmeyen istekler için
+  daha ucuz/hızlı modeli kullanmaya devam eder.
 - **İstek formatı:** tek mesajda önce `image` bloğu (`source.type`
   `"base64"`, `media_type` `"image/jpeg"`), sonra `text` bloğu. Model
   mevcut kelime listesindeki Almanca temel biçimleri de istem içinde
   görür ve bunları tekrar çıkarmaması söylenir. İstemdeki eleme satırı
   **sabit değil**, seçilen alt sınırdan üretilir (`seviyeElemeMetni()`) —
-  bkz. "Kelime seviyeleri". Özel isimler ve sayılar her durumda elenir,
-  en fazla 20 kelime sınırı ve "fazlası varsa en yüksek seviyeliler"
-  kuralı alt sınırdan bağımsız geçerlidir.
+  bkz. "Kelime seviyeleri". Özel isimler ve sayılar her durumda elenir.
 - `gorselKelimeCikar(base64Jpeg, altSeviye, ilerlemeFn)` alt sınırı
   parametre olarak alır, `AYAR`'ı kendisi okumaz — çağıran taraf
   (`fotoIslemeBasla()`) `AYAR.fotoSeviye`'yi geçirir.
-- **Yanıt** sadece bir JSON dizisi olmalı; ayrıştırma mevcut
-  `jsonAyikla` mantığının dizi hali (`diziAyikla`) ile ilk `[` ile son
-  `]` arasını alır, ham metni hata mesajına ekler — cümle önerisiyle
-  aynı dayanıklılık yaklaşımı.
-- **Onay ekranı:** her aday kelime düzenlenebilir alanlarla (tür,
-  artikel, Almanca, çoğul/formlar, Türkçe, cümle, cümle çevirisi) ve
-  bir onay kutusuyla gösterilir — OCR ve model tahmini hata yapabilir.
-  Mevcut listede zaten olan kelimeler (artikelsiz, küçük harfe
+- **Yanıt** sadece bir JSON dizisi olmalı; ayrıştırma `diziAyikla()` ile
+  ilk `[` ile son `]` arasını alır, ham metni hata mesajına ekler — cümle
+  önerisiyle aynı dayanıklılık yaklaşımı.
+
+#### Aşama 2 — seçilenler için cümle (`cumleleriTamamla`)
+
+"Seçilenleri ekle" tıklanınca, sadece **işaretli** kelimeler için cümle
+üretilir. Sıra şöyle: önce işaretli satırlar gövdeye çevrilir, sonra
+cümleler üretilir, en sonunda hepsi tek `kelimeleriEkleGovde()` çağrısıyla
+kaydedilir.
+
+- `cumleleriTamamla(govdeler, ilerlemeFn)` listeyi `AI_CUMLE_PARTI` (15)
+  büyüklüğünde partilere böler ve her parti için **ayrı bir istek** atar
+  (`cumlePartisiUret`, `AI_MODEL`, `AI_CUMLE_PARTI_MAX_TOKENS`). Her istek
+  yine bir JSON dizisi döndürür.
+- **İlerleme gösterilir:** `ilerlemeFn` ile `fotoDurum`'a
+  "Cümleler üretiliyor (15/42)" yazılır; sayı o an işlenmekte olan partinin
+  sonuna kadar tamamlanan kelime sayısıdır.
+- **Bir parti başarısız olursa diğerleri devam eder** — `try/catch` sadece
+  o partiyi atlar. Cümlesi üretilemeyen kelimeler **yine de eklenir**,
+  `cumle` alanı boş kalır, iki kartı olur ve sonradan düzenleme
+  ekranındaki "Cümle öner" ile tamamlanabilir. Kaç kelimenin cümlesiz
+  kaldığı bildirimde söylenir.
+- Model yanıtındaki her öge listedeki 1 tabanlı `no` alanıyla eşlenir;
+  `no` yoksa dizideki sıra kullanılır. `{{` içermeyen ya da `cumle_tr`'si
+  boş olan öge sessizce atlanır (o kelime cümlesiz kalır).
+- **Cümle üretim istemi "Cümle öner" ile aynı kuralları taşır:** B1-B2
+  seviyesinde, 12 kelimeyi geçmeyen, `{{ }}` işaretli, Türkçesiyle birlikte.
+- **Bayat istek koruması:** `fotoEkleBtn` işleyicisi `fotoEkleNo`'yu artırıp
+  yerel bir kopyasını saklar; `fotoPaneliSifirla()` de bu sayacı artırır.
+  Cümleler üretilirken panel kapatılıp yeniden açılırsa istek bayatlar ve
+  kullanıcının yeni oturumunun DOM'una/durumuna dokunmaz — kelimeler yine de
+  eklenir. Oyunlardaki `OYUN_ISTEK_NO` ile aynı amaç.
+
+#### Onay ekranı
+
+- Her aday kelime düzenlenebilir alanlarla (tür, artikel, Almanca,
+  çoğul/formlar, Türkçe, grup, seviye) ve bir onay kutusuyla gösterilir —
+  OCR ve model tahmini hata yapabilir. **Cümle alanı yoktur**, cümleler
+  aşama 2'de üretilir.
+- Mevcut listede zaten olan kelimeler (artikelsiz, küçük harfe
   indirgenerek karşılaştırılır) işaretlenir ve varsayılan olarak
-  işaretsiz gelir. "Seçilenleri ekle" işaretli kelimeleri mevcut kelime
-  ekleme akışına sokar — GitHub senkronu dahil.
-- Modelin ürettiği `seviye` alanı (CEFR tahmini) hem onay ekranında
-  düzenlenebilir bir açılır menü olarak gösterilir hem de kaydedilen kelime
-  nesnesine yazılır — bkz. "Kelime seviyeleri".
-- `sw.js`, görsel çıkarma isteklerini de aynı `api.anthropic.com`
-  isteği olarak cache'lemeden ağa geçirir — ayrı bir kural gerekmez.
+  işaretsiz gelir.
+- **Seçim sayacı sürekli görünür.** `#fotoSecimOzet` (`.foto-secim-ozet`,
+  `position:sticky`) "12 / 80 kelime seçili" yazar; 80 satırlık listede
+  kaydırırken de üstte kalır. `fotoSecimOzetGuncelle()` sayıyı
+  `fotoSeciliIndisler()`'den okur ve üç yerden çağrılır: satır onay
+  kutusunun `onchange`'i, `fotoSeviyeIsaretleriUygula()` ve
+  `fotoSonucCiz()` (ikincisi üzerinden). Yeni bir toplu işaretleme yolu
+  eklersen bu fonksiyonu da çağır.
+- `fotoSeciliIndisler()` hem sayaç hem "Seçilenleri ekle" için tek
+  kaynaktır — ikisi farklı yerden okumasın.
+- Seviye filtresi düğmeleri uzun listede kritik; davranışı için bkz.
+  "Kelime seviyeleri — Onay ekranındaki seviye filtresi".
+- "Seçilenleri ekle" işaretli kelimeleri mevcut kelime ekleme akışına
+  sokar — GitHub senkronu dahil.
+
+#### GitHub yazma
+
+Bir fotoğraf partisinden eklenen bütün kelimeler `kelimeleriEkleGovde()` ile
+tek seferde `BEKLEYEN`'e girer, ardından **tek** `senkronEt()` çağrısı
+hepsini `ghKelimeleriYaz()` ile tek `PUT`/tek commit olarak yazar. Kelime
+başına ayrı commit atma — 80 kelimelik bir parti 80 commit üretmemeli.
+
+`sw.js`, görsel çıkarma ve cümle üretme isteklerini de aynı
+`api.anthropic.com` isteği olarak cache'lemeden ağa geçirir — ayrı bir kural
+gerekmez.
 
 ## GitHub kelime senkronu
 

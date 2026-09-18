@@ -202,6 +202,14 @@ button:disabled{opacity:.55;cursor:default}
   background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);
   padding:14px;
 }
+/* onay ekraninin ustunde kalan secim sayaci — 80 kelimelik listede kac
+   kelimenin secili oldugu kaydirirken de gorunur kalsin diye sticky */
+.foto-secim-ozet{
+  position:sticky;top:0;z-index:2;
+  margin:0 -16px;padding:10px 16px;
+  background:var(--bg);border-bottom:1px solid var(--cizgi);
+  font-size:.9rem;font-weight:600;
+}
 .foto-oge-ust{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--sonuk)}
 .foto-oge-ust input{width:auto}
 .foto-tekrar{color:var(--uyari);font-weight:600}
@@ -455,6 +463,8 @@ button:disabled{opacity:.55;cursor:default}
       Ders kitabı sayfası ya da not fotoğrafı çek. Sayfadaki Almanca kelimeler
       otomatik çıkarılır; seçtiğin seviyenin altındakiler, özel isimler ve
       sayılar elenir. Listede zaten olan kelimeler ayrıca işaretlenir.
+      Örnek cümleler bu adımda üretilmez — sadece seçip eklediğin kelimeler için
+      üretilir.
     </p>
     <p class="yardim" style="margin-bottom:-6px">Hangi seviyeden itibaren çıkarılsın?</p>
     <div class="seviye-secici" id="fotoSeviyeSecici"></div>
@@ -468,6 +478,7 @@ button:disabled{opacity:.55;cursor:default}
       <button type="button" class="birincil" id="fotoGrupDevam">Devam</button>
     </div>
     <div id="fotoDurum"></div>
+    <div id="fotoSecimOzet" class="gizli foto-secim-ozet"></div>
     <div id="fotoSeviyeFiltre" class="gizli seviye-filtre"></div>
     <div id="fotoSonuc" style="display:flex;flex-direction:column;gap:10px"></div>
     <button type="button" class="birincil gizli" id="fotoEkleBtn">Seçilenleri ekle</button>
@@ -583,7 +594,10 @@ const K_BEKLEYEN  = 'wortkasten:beklenenKelimeler';  // henuz repoya yazilmamis 
 const AI_MODEL = 'claude-haiku-4-5-20251001';
 const AI_GORSEL_MODEL = 'claude-sonnet-5';
 const AI_CUMLE_MAX_TOKENS = 300;    // cumle onerisi — tek cumle + ceviri
-const AI_GORSEL_MAX_TOKENS = 8000;  // fotograftan kelime cikarma — sayfa basina 15-20 kelime, her biri cumlesiyle
+const AI_GORSEL_MAX_TOKENS = 8000;  // fotograftan kelime cikarma — cumlesiz, kayit basina az token
+const AI_CUMLE_PARTI = 15;          // asama 2: tek istekte cumlesi uretilen kelime sayisi
+const AI_CUMLE_PARTI_MAX_TOKENS = 3000;  // AI_CUMLE_PARTI kadar cumle + ceviri
+const FOTO_MAKS_KELIME = 80;        // bir fotograftan cikarilacak en fazla kelime
 const AI_BOSLUK_MAX_TOKENS = 1200;  // oyun: bosluk doldurma — 5-8 cumlelik metin + cevap dizisi
 const AI_AVCI_MAX_TOKENS = 1200;    // oyun: hatali kelime avi — 6-8 cumlelik metin + hata aciklamalari
 const GITHUB_SAHIP = 'mugiatama34';
@@ -595,7 +609,7 @@ const SEVIYELER = ['A1', 'A2', 'B1', 'B2', 'C1'];
 const SEVIYESIZ_ETIKET = '—';  // seviyesi olmayan adaylarin filtre/gruplama anahtari
 
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v23';
+const SURUM = 'wortkasten-v24';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
@@ -619,6 +633,7 @@ let fotoAdaylar = [];  // fotograftan cikarilan, onay bekleyen kelime adaylari
 let fotoSeciliDosya = null;  // grup sorulurken bekleyen fotograf dosyasi
 let fotoPartiGrubu = '';     // o fotograf partisindeki tum kelimelere uygulanacak grup
 let fotoSeviyeKapali = new Set();  // onay ekraninda kapatilmis (isareti kaldirilmis) seviyeler
+let fotoEkleNo = 0;    // "Seçilenleri ekle" istek sirasi — panel sifirlanirsa artar
 
 // calisma kuyrugunu belli bir gruba daraltir. null: tum kelimeler,
 // '': grubu olmayan kelimeler, aksi halde grup adi. Kalici degil,
@@ -2322,6 +2337,32 @@ function diziKismiKurtar(metin) {
   return liste;
 }
 
+// bir JSON dizisi bekleyen yanitin govdesini coz. Yanit max_tokens ile
+// yarida kesilmisse hata firlatmaz, tam kalan ogeleri diziKismiKurtar ile
+// kurtarir — hem fotograftan kelime cikarma hem cumle partileri boyle
+// calisir, yarim bir yanittan kurtarilabilen her kayit ise yarar.
+function diziYanitiCoz(veri) {
+  const bloklar = (veri && Array.isArray(veri.content)) ? veri.content : [];
+  const metin = bloklar.filter(b => b && b.type === 'text').map(b => b.text).join('\n');
+  if (!metin) {
+    const turler = bloklar.map(b => b && b.type).join(', ') || '(boş)';
+    throw new Error('Beklenmeyen yanıt formatı (text bloğu yok) — gelen blok türleri: ' + turler);
+  }
+
+  const kesikMi = veri && veri.stop_reason === 'max_tokens';
+  if (kesikMi) return { liste: diziKismiKurtar(metin), kesikMi };
+
+  let sonuc;
+  try { sonuc = JSON.parse(diziAyikla(metin)); }
+  catch (h) {
+    throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 300));
+  }
+  if (!Array.isArray(sonuc)) {
+    throw new Error('Yanıt bir JSON dizisi değil — ham metin: ' + metin.slice(0, 300));
+  }
+  return { liste: sonuc, kesikMi };
+}
+
 const FOTO_TURLER = ['isim', 'fiil', 'sifat', 'diger'];
 const FOTO_ARTIKELLER = ['der', 'die', 'das'];
 
@@ -2341,7 +2382,9 @@ function seviyeElemeMetni(altSinir) {
   return alttakiler.slice(0, -1).join(', ') + ' ve ' + alttakiler[alttakiler.length - 1];
 }
 
-// modelden gelen ham ogeyi guvenli, tum alanlari string olan bir nesneye cevirir
+// modelden gelen ham ogeyi guvenli, tum alanlari string olan bir nesneye
+// cevirir. Cumle alanlari burada yok — asama 1 cumle istemez, cumleler
+// "Seçilenleri ekle"den sonra uretilir (bkz. CLAUDE.md).
 function fotoOgeTemizle(o) {
   return {
     tur: FOTO_TURLER.includes(o.tur) ? o.tur : 'diger',
@@ -2350,12 +2393,14 @@ function fotoOgeTemizle(o) {
     cogul: typeof o.cogul === 'string' ? o.cogul.trim() : '',
     formlar: typeof o.formlar === 'string' ? o.formlar.trim() : '',
     tr: o.tr.trim(),
-    seviye: seviyeNormal(o.seviye),
-    cumle: typeof o.cumle === 'string' ? o.cumle.trim() : '',
-    cumle_tr: typeof o.cumle_tr === 'string' ? o.cumle_tr.trim() : ''
+    seviye: seviyeNormal(o.seviye)
   };
 }
 
+// AŞAMA 1 — fotograftan SADECE kelime cikarir, cumle istemez. Kayit basina
+// dusen token boylece cok kucuk oldugu icin kelime siniri 80'e cikarilabildi;
+// kelime listesi sayfalari (70+ kelime) tek yanita sigar. Kesilme kontrolu ve
+// kismi kurtarma yine de duruyor — bkz. CLAUDE.md.
 async function gorselKelimeCikar(base64Jpeg, altSeviye, ilerlemeFn) {
   const mevcutKelimeler = KELIMELER.map(k => k.de).join(', ') || '(liste boş)';
   // alt sinirin altindaki seviyeler ismen elenir; sinir yoksa sadece ozel
@@ -2375,23 +2420,20 @@ Her kelime için şu alanları üret:
 - formlar: sadece fiillerde, "geht, ging, ist gegangen" biçiminde
 - tr: Türkçe karşılığı
 - seviye: kelimenin CEFR seviyesi tahmini — "A1", "A2", "B1", "B2" ya da "C1"
-- cumle: B1-B2 seviyesinde, en fazla 12 kelimelik, yeni kurulmuş doğal bir
-  Almanca cümle. Sayfadaki cümlenin birebir aynısı olmasın, ama kelimenin
-  sayfada geçtiği bağlamdan da kopmasın. Hedef kelimeyi çekimli hâliyle
-  çift süslü parantez içine al, örnek: {{gegangen}}.
-- cumle_tr: cumle alanının Türkçe çevirisi
+
+Örnek cümle üretme, sadece yukarıdaki alanları doldur.
 
 ${elemeSatiri}
 
-En fazla 20 kelime çıkar. Sayfada bundan fazla uygun kelime varsa, seviyesi
-en yüksek olan 20 taneyi seç.
+En fazla ${FOTO_MAKS_KELIME} kelime çıkar. Sayfada bundan fazla uygun kelime
+varsa, seviyesi en yüksek olan ${FOTO_MAKS_KELIME} taneyi seç.
 
 Şu kelimeler zaten listede var, bunları tekrar çıkarma:
 ${mevcutKelimeler}
 
 Yanıtın SADECE bir JSON dizisi olsun, başka hiçbir metin, açıklama ya da
 markdown kod bloğu ekleme. Örnek:
-[{"de":"Ansatz","tur":"isim","artikel":"der","cogul":"Ansätze","tr":"yaklaşım","seviye":"B1","cumle":"Der neue {{Ansatz}} funktioniert gut.","cumle_tr":"Yeni yaklaşım iyi çalışıyor."}]`;
+[{"de":"Ansatz","tur":"isim","artikel":"der","cogul":"Ansätze","tr":"yaklaşım","seviye":"B1"}]`;
 
   if (ilerlemeFn) ilerlemeFn('Gönderiliyor...');
 
@@ -2412,30 +2454,10 @@ markdown kod bloğu ekleme. Örnek:
 
   // yanitMetni() burada kullanilmiyor: o max_tokens'ta dogrudan hata firlatir,
   // ama fotograftan cikarmada yarim kalan yanittan da tam kayitlari kurtarmak
-  // istiyoruz — bkz. diziKismiKurtar.
-  const bloklar = (veri && Array.isArray(veri.content)) ? veri.content : [];
-  const metin = bloklar.filter(b => b && b.type === 'text').map(b => b.text).join('\n');
-  if (!metin) {
-    const turler = bloklar.map(b => b && b.type).join(', ') || '(boş)';
-    throw new Error('Beklenmeyen yanıt formatı (text bloğu yok) — gelen blok türleri: ' + turler);
-  }
+  // istiyoruz — bkz. diziYanitiCoz / diziKismiKurtar.
+  const { liste, kesikMi } = diziYanitiCoz(veri);
 
-  const kesikMi = veri && veri.stop_reason === 'max_tokens';
-
-  let sonuc;
-  if (kesikMi) {
-    sonuc = diziKismiKurtar(metin);
-  } else {
-    try { sonuc = JSON.parse(diziAyikla(metin)); }
-    catch (h) {
-      throw new Error('Yanıt ayrıştırılamadı — ham metin: ' + metin.slice(0, 300));
-    }
-    if (!Array.isArray(sonuc)) {
-      throw new Error('Yanıt bir JSON dizisi değil — ham metin: ' + metin.slice(0, 300));
-    }
-  }
-
-  sonuc = sonuc
+  const sonuc = liste
     .filter(o => o && typeof o === 'object' && typeof o.de === 'string' && o.de.trim() &&
                  typeof o.tr === 'string' && o.tr.trim())
     .map(fotoOgeTemizle);
@@ -2446,6 +2468,77 @@ markdown kod bloğu ekleme. Örnek:
       : 'Fotoğrafta uygun kelime bulunamadı — daha net ve daha yakından çekmeyi dene');
   }
   return { liste: sonuc, kesikMi };
+}
+
+// AŞAMA 2 — tek bir parti (en fazla AI_CUMLE_PARTI kelime) icin cumle uretir.
+// Doner deger: parti icindeki indise gore {cumle, cumle_tr} eslemesi; model
+// bir kelimeyi atlar ya da bozuk dondururse o kelime eslemede hic yer almaz.
+// Istem "Cümle öner" ile ayni kurallari tasir: B1-B2, en fazla 12 kelime,
+// {{ }} isaretli, Turkcesiyle birlikte.
+async function cumlePartisiUret(parca) {
+  const turMetinler = { isim: 'isim', fiil: 'fiil', sifat: 'sıfat', diger: 'diğer' };
+  const kelimeSatirlari = parca.map((g, i) => {
+    const tam = (g.tur === 'isim' && g.artikel) ? g.artikel + ' ' + g.de : g.de;
+    return `${i + 1}. ${tam} (${turMetinler[g.tur] || g.tur}) — ${g.tr}`;
+  }).join('\n');
+
+  const istemMetni = `Almanca öğrenen Türkçe konuşan biri için aşağıdaki kelimelerin her birine bir örnek cümle üret.
+
+${kelimeSatirlari}
+
+Her kelime için B1-B2 seviyesinde, günlük hayatta kurulabilecek doğal bir
+Almanca cümle yaz. Cümle en fazla 12 kelime olsun. Hedef kelimeyi cümlede
+geçtiği çekimli haliyle çift süslü parantez içine al, örnek: {{gegangen}}.
+Cümlenin Türkçe çevirisini de ekle.
+
+Yanıtın SADECE bir JSON dizisi olsun, başka hiçbir metin, açıklama ya da
+markdown kod bloğu ekleme. Her öge yukarıdaki listedeki numarayı "no"
+alanında taşısın, dizinin sırası da listeyle aynı olsun:
+[{"no":1,"cumle":"Der neue {{Ansatz}} funktioniert gut.","cumle_tr":"Yeni yaklaşım iyi çalışıyor."}]`;
+
+  const veri = await anthropicIstek({
+    model: AI_MODEL,
+    max_tokens: AI_CUMLE_PARTI_MAX_TOKENS,
+    messages: [{ role: 'user', content: istemMetni }]
+  });
+
+  const { liste } = diziYanitiCoz(veri);
+  const esleme = new Map();
+  liste.forEach((o, sira) => {
+    if (!o || typeof o !== 'object') return;
+    // "no" yoksa dizideki sirayi kullan — model numarayi atlarsa da kurtaralim
+    const i = (typeof o.no === 'number' && isFinite(o.no) ? Math.round(o.no) : sira + 1) - 1;
+    if (i < 0 || i >= parca.length || esleme.has(i)) return;
+    if (typeof o.cumle !== 'string' || !o.cumle.includes('{{')) return;
+    if (typeof o.cumle_tr !== 'string' || !o.cumle_tr.trim()) return;
+    esleme.set(i, { cumle: o.cumle.trim(), cumle_tr: o.cumle_tr.trim() });
+  });
+  return esleme;
+}
+
+// govde listesini AI_CUMLE_PARTI'lik partilere bolup her parti icin ayri
+// istek atar ve cumleleri govdelerin uzerine yazar. Bir parti basarisiz
+// olursa digerleri devam eder; cumlesi uretilemeyen kelime yine de eklenir,
+// cumle alani bos kalir (iki karti olur, sonradan duzenleme ekranindaki
+// "Cümle öner" ile tamamlanabilir). Doner deger: cumlesi uretilen kelime sayisi.
+async function cumleleriTamamla(govdeler, ilerlemeFn) {
+  let tamamlanan = 0;
+  for (let bas = 0; bas < govdeler.length; bas += AI_CUMLE_PARTI) {
+    const parca = govdeler.slice(bas, bas + AI_CUMLE_PARTI);
+    if (ilerlemeFn) {
+      ilerlemeFn('Cümleler üretiliyor (' +
+        Math.min(bas + parca.length, govdeler.length) + '/' + govdeler.length + ')');
+    }
+    let esleme;
+    try { esleme = await cumlePartisiUret(parca); }
+    catch (h) { continue; }  // bu parti cumlesiz kalir, kalan partiler devam eder
+    esleme.forEach((c, i) => {
+      parca[i].cumle = c.cumle;
+      parca[i].cumle_tr = c.cumle_tr;
+      tamamlanan++;
+    });
+  }
+  return tamamlanan;
 }
 
 // karsilastirma icin: artikel varsa bastan at, kucuk harfe indirge
@@ -2502,17 +2595,12 @@ function fotoOgeHtml(a, i, tekrarMi) {
     <label>Türkçe
       <input id="fo-tr-${i}" autocomplete="off" value="${kac(a.tr)}">
     </label>
-    <label>Örnek cümle
-      <textarea id="fo-cumle-${i}">${kac(a.cumle)}</textarea>
-    </label>
-    <label>Cümlenin Türkçesi
-      <input id="fo-cumletr-${i}" autocomplete="off" value="${kac(a.cumle_tr)}">
-    </label>
   </div>`;
 }
 
 function fotoOgeBagla(i) {
   const a = fotoAdaylar[i];
+  document.getElementById(`fo-sec-${i}`).onchange = fotoSecimOzetGuncelle;
   const turSel = document.getElementById(`fo-tur-${i}`);
   const guncelle = () => {
     const t = turSel.value;
@@ -2585,6 +2673,27 @@ function fotoSeviyeIsaretleriUygula() {
     if (!cb) return;
     cb.checked = fotoSeviyeKapali.has(s) ? false : !cb.dataset.tekrar;
   });
+  fotoSecimOzetGuncelle();
+}
+
+// o an isaretli aday indislerini doner — sayac ve "Seçilenleri ekle" ayni
+// kaynagi kullansin diye tek yerde
+function fotoSeciliIndisler() {
+  return fotoAdaylar
+    .map((a, i) => i)
+    .filter(i => {
+      const cb = document.getElementById(`fo-sec-${i}`);
+      return cb && cb.checked;
+    });
+}
+
+// onay ekraninin ustundeki sticky sayac — 80 kelimelik listede kac kelimenin
+// secili oldugu kaydirirken de gorunur kalir
+function fotoSecimOzetGuncelle() {
+  const el = document.getElementById('fotoSecimOzet');
+  if (!fotoAdaylar.length) { el.textContent = ''; el.classList.add('gizli'); return; }
+  el.classList.remove('gizli');
+  el.textContent = fotoSeciliIndisler().length + ' / ' + fotoAdaylar.length + ' kelime seçili';
 }
 
 function fotoSonucCiz() {
@@ -2626,6 +2735,8 @@ function fotoPaneliSifirla() {
   fotoSeciliDosya = null;
   fotoPartiGrubu = '';
   fotoSeviyeKapali.clear();
+  // suren bir asama 2 istegi varsa artik bayat sayilsin — bkz. fotoEkleBtn
+  fotoEkleNo++;
   fotoDurumGoster('');
   fotoSonucCiz();
   fotoSeviyeSeciciCiz();
@@ -2704,22 +2815,19 @@ document.getElementById('fotoGrupGiris').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); fotoIslemeBasla(); }
 });
 
-document.getElementById('fotoEkleBtn').onclick = () => {
+// "Seçilenleri ekle": once secilen satirlar govdeye cevrilir, sonra AŞAMA 2
+// calisir — sadece bu kelimeler icin, partiler halinde cumle uretilir. Cumlesi
+// uretilemeyenler de eklenir. Tum kelimeler tek seferde kelimeleriEkleGovde()
+// ile BEKLEYEN'e gider ve tek senkronEt() cagrisiyla TEK commit olarak yazilir.
+document.getElementById('fotoEkleBtn').onclick = async () => {
   const govdeler = [];
-  fotoAdaylar.forEach((a, i) => {
-    const sec = document.getElementById(`fo-sec-${i}`);
-    if (!sec || !sec.checked) return;
-
+  fotoSeciliIndisler().forEach(i => {
     const tur = document.getElementById(`fo-tur-${i}`).value;
     const de = document.getElementById(`fo-de-${i}`).value.trim();
     const tr = document.getElementById(`fo-tr-${i}`).value.trim();
     if (!de || !tr) return;
 
-    const govde = {
-      tur, de, tr,
-      cumle: document.getElementById(`fo-cumle-${i}`).value.trim(),
-      cumle_tr: document.getElementById(`fo-cumletr-${i}`).value.trim()
-    };
+    const govde = { tur, de, tr, cumle: '', cumle_tr: '' };
     if (tur === 'isim') {
       govde.artikel = document.getElementById(`fo-artikel-${i}`).value;
       govde.cogul = document.getElementById(`fo-cogul-${i}`).value.trim();
@@ -2736,11 +2844,40 @@ document.getElementById('fotoEkleBtn').onclick = () => {
 
   if (!govdeler.length) { bildir('Eklenecek kelime seçilmedi'); return; }
 
+  // cumle uretimi surerken panel kapatilip yeniden acilirsa fotoPaneliSifirla()
+  // fotoEkleNo'yu artirir; bu istek bayatlar ve kullanicinin yeni oturumunun
+  // DOM'una/durumuna dokunmaz. Kelimeler yine de eklenir (oyunlardaki
+  // OYUN_ISTEK_NO ile ayni amac).
+  const benimNo = ++fotoEkleNo;
+  const guncelMi = () => benimNo === fotoEkleNo;
+
+  const ekleBtn = document.getElementById('fotoEkleBtn');
+  const secBtn = document.getElementById('fotoSec');
+  const eskiMetin = ekleBtn.textContent;
+  ekleBtn.disabled = true; secBtn.disabled = true;
+  ekleBtn.textContent = 'Cümleler üretiliyor...';
+
+  let cumlesiz = govdeler.length;
+  try {
+    if (API_ANAHTARI) {
+      cumlesiz -= await cumleleriTamamla(govdeler, m => { if (guncelMi()) fotoDurumGoster(m); });
+    }
+  } finally {
+    if (guncelMi()) {
+      ekleBtn.disabled = false; secBtn.disabled = false;
+      ekleBtn.textContent = eskiMetin;
+    }
+  }
+
   const eklenenler = kelimeleriEkleGovde(govdeler);
-  bildir(eklenenler.length === 1 ? eklenenler[0].de + ' eklendi' : eklenenler.length + ' kelime eklendi');
+  const temel = eklenenler.length === 1
+    ? eklenenler[0].de + ' eklendi'
+    : eklenenler.length + ' kelime eklendi';
+  bildir(cumlesiz
+    ? temel + ' — ' + cumlesiz + ' kelimenin cümlesi üretilemedi, düzenleme ekranından tamamlayabilirsin'
+    : temel);
   kuyrukKur();
-  fotoPaneliSifirla();
-  panelKapat();
+  if (guncelMi()) { fotoPaneliSifirla(); panelKapat(); }
   if (GH_TOKEN) senkronEt();
 };
 
