@@ -36,6 +36,11 @@ kopyala" ile `kelimeler.json` dosyasına taşıyabilirsin.
 **Doğrudan `kelimeler.json` içine:** Telefondan GitHub web arayüzüyle de
 düzenlenebilir. Kaydettiğin an yayına girer.
 
+**Fotoğraftan:** Menü → Fotoğraftan ekle. İki aşamalı çalışır — önce
+sayfadaki kelimeler çıkarılır (cümle üretilmez), sen onay ekranından
+seçimini yaptıktan sonra sadece seçtiğin kelimeler için örnek cümle
+üretilir. Ayrıntılar için "Fotoğraftan ekleme" bölümüne bak.
+
 ## Kelime formatı
 
 ```json
@@ -135,7 +140,7 @@ kuyruğu etkilemez.
 üstünde beş düğme var: Tümü · A2+ · B1+ · B2+ · C1+. Seçtiğin sınırın
 altındaki kelimeler sayfadan hiç çıkarılmaz. Seçim hatırlanır (varsayılan
 B1+), her fotoğrafta yeniden sorulmaz. Özel isimler ve sayılar her durumda
-elenir; bir sayfadan en fazla 20 kelime çıkarılır, fazlası varsa seviyesi en
+elenir; bir sayfadan en fazla 80 kelime çıkarılır, fazlası varsa seviyesi en
 yüksek olanlar seçilir.
 
 Onay ekranının üstünde, o partide çıkan seviyeler sayılarıyla düğme olarak
@@ -143,6 +148,30 @@ listelenir ("B2 (7)"). Bir seviyeyi kapatırsan o seviyedeki kelimelerin
 işareti topluca kalkar, geri açınca gelir — satırlar kaybolmaz, tek tek
 işaretleme de çalışmaya devam eder. Model tahmini sınır kelimelerde
 yanılabildiği için her satırda seviyeyi elle düzeltebileceğin bir menü var.
+
+## Fotoğraftan ekleme
+
+Menü → Fotoğraftan ekle. Akış iki aşamaya bölünmüştür; tek bir istekte hem
+kelime çıkarıp hem cümle üretmek uzun kelime listesi sayfalarında yanıtın
+yarıda kesilmesine yol açıyordu.
+
+**1. Kelime çıkarma.** Fotoğraf gönderilir, sayfadaki kelimeler temel biçim,
+tür, artikel/çoğul (ya da fiil formları), Türkçe karşılık ve seviye
+tahminiyle birlikte döner. Bu aşamada örnek cümle istenmez, bu yüzden bir
+sayfadan 80 kelimeye kadar tek yanıta sığar. Yanıt yine de yarıda kesilirse
+tamamlanmış kayıtlar kurtarılır ve durum satırında söylenir.
+
+**2. Cümle üretimi.** Onay ekranında seçimini yapıp "Seçilenleri ekle"ye
+bastığında, sadece seçtiğin kelimeler için 15'erli gruplar hâlinde örnek
+cümle üretilir. İlerleme ekranda görünür: "Cümleler üretiliyor (15/42)". Bir
+grup başarısız olursa diğerleri devam eder; cümlesi üretilemeyen kelime yine
+de eklenir, cümle alanı boş kalır (iki kartı olur) ve sonradan düzenleme
+ekranındaki "Cümle öner" ile tamamlanabilir.
+
+Onay ekranının en üstünde kaç kelimenin seçili olduğu (`12 / 80 kelime
+seçili`) liste kaydırılırken de görünür kalır. GitHub senkronu açıksa bir
+seferde eklenen bütün kelimeler tek bir commit olarak yazılır, kelime başına
+ayrı commit atılmaz.
 
 ## Oyunlar
 
