@@ -62,6 +62,9 @@ düzenlenebilir. Kaydettiğin an yayına girer.
   Boşluğa dönüşecek kelimeyi `{{ }}` içine al — cümledeki çekimli hâliyle.
 - `grup` isteğe bağlı — ünite/grup adı. Yoksa alan hiç yazılmaz, arayüzde
   "Grupsuz" gösterilir (bkz. "Kelime grupları").
+- `seviye` isteğe bağlı — CEFR seviyesi: `A1` · `A2` · `B1` · `B2` · `C1`.
+  Yoksa alan hiç yazılmaz (bkz. "Kelime seviyeleri"). Sadece etiketleme ve
+  filtreleme için — tekrar zamanlamasını etkilemez.
 
 ## Kart üretimi
 
@@ -116,6 +119,30 @@ işaret kutusu çıkar, "Tümünü seç" o an ekranda görünen (arama/filtre
 uygulanmış) kelimeleri seçer. Seçtiklerine tek seferde bir grup
 atayabilirsin — mevcut gruplardan seçip ya da yeni bir ad yazıp
 "Grup ata"ya basmadan önce kaç kelimenin etkileneceği sorulur.
+
+## Kelime seviyeleri
+
+Her kelimeye isteğe bağlı bir CEFR seviyesi (A1–C1) verilebilir. Kelime
+ekleme/düzenleme ekranındaki "Seviye" menüsünden elle seçilir; fotoğraftan
+eklerken modelin tahmini hazır gelir. Menu → Kelimeler ekranında grup
+filtresinin yanındaki seviye filtresiyle listeyi daraltabilirsin — iki filtre
+birlikte çalışır (örn. "Ünite 9" + "B2").
+
+Seviye sadece bir etikettir: tekrar zamanlamasını, kart üretimini ya da
+kuyruğu etkilemez.
+
+**Fotoğraftan eklerken alt sınır.** Fotoğraf ekranında "Fotoğraf seç"in
+üstünde beş düğme var: Tümü · A2+ · B1+ · B2+ · C1+. Seçtiğin sınırın
+altındaki kelimeler sayfadan hiç çıkarılmaz. Seçim hatırlanır (varsayılan
+B1+), her fotoğrafta yeniden sorulmaz. Özel isimler ve sayılar her durumda
+elenir; bir sayfadan en fazla 20 kelime çıkarılır, fazlası varsa seviyesi en
+yüksek olanlar seçilir.
+
+Onay ekranının üstünde, o partide çıkan seviyeler sayılarıyla düğme olarak
+listelenir ("B2 (7)"). Bir seviyeyi kapatırsan o seviyedeki kelimelerin
+işareti topluca kalkar, geri açınca gelir — satırlar kaybolmaz, tek tek
+işaretleme de çalışmaya devam eder. Model tahmini sınır kelimelerde
+yanılabildiği için her satırda seviyeyi elle düzeltebileceğin bir menü var.
 
 ## Oyunlar
 

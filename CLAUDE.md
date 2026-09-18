@@ -50,6 +50,7 @@ yapamaz hale getirmiş olursun.
   "cogul": "Werkzeuge",
   "tr": "alet, takım",
   "grup": "Ünite 3",
+  "seviye": "B1",
   "cumle": "Das {{Werkzeug}} liegt auf dem Tisch.",
   "cumle_tr": "Alet masanın üstünde duruyor.",
   "etiket": ["teknik"]
@@ -61,6 +62,9 @@ yapamaz hale getirmiş olursun.
 - `cumle` isteğe bağlı; `{{ }}` içindeki kelime boşluğa dönüşür
 - `grup` isteğe bağlı, ünite/grup adı. Yoksa alan hiç yazılmaz — bkz.
   "Kelime grupları"
+- `seviye` isteğe bağlı CEFR seviyesi: `A1` · `A2` · `B1` · `B2` · `C1`.
+  Geçerli listede olmayan değer `seviyeNormal()` ile `''`e indirgenir;
+  boşsa alan `grup` gibi hiç yazılmaz — bkz. "Kelime seviyeleri"
 
 **`id` alanları asla değiştirilmez.** Tekrar geçmişi `localStorage`'da
 `<id>:de-tr` gibi anahtarlarla tutuluyor. Bir `id` değişirse o kelimenin
@@ -155,10 +159,13 @@ hangi yoldan geldiğine bakılmaksızın (tam yanıt, `diziKismiKurtar()` ile
 kısmi kurtarma, ya da ikinci bir fotoğraftan gelen ek aday) sonuç aynıdır.
 Alan boş bırakılırsa o kelimeye `grup` hiç yazılmaz.
 
-**Kelime listesi ekranı.** Arama kutusunun yanındaki `lGrupFiltre`
-açılır menüsü her grubu (ve "Grupsuz"u) içerdiği kelime sayısıyla listeler
-(`lGrupFiltreDoldur()`), seçim `listeCiz()`'i filtreler. Kalıcı değil,
-panel her açıldığında yeniden kurulur.
+**Kelime listesi ekranı.** Arama kutusunun altındaki `lGrupFiltre` ve
+`lSeviyeFiltre` açılır menüleri her grubu (ve "Grupsuz"u) / her seviyeyi
+(ve "Seviyesiz"i) içerdiği kelime sayısıyla listeler
+(`lGrupFiltreDoldur()`, `lSeviyeFiltreDoldur()`); ikisi de `listeCiz()`'i
+filtreler ve **birbirinden bağımsız, birlikte daraltır** — grup ve seviye
+aynı anda seçilebilir. `lSeviyeFiltre` sadece o an kullanımda olan
+seviyeleri gösterir. Kalıcı değil, panel her açıldığında yeniden kurulur.
 
 **Toplu grup atama.** Kelimeler panelindeki "Seç" düğmesi (`lSecModu`)
 çoklu seçim moduna girer (`listeSecimModu`); `listeCiz()` bu moddayken
@@ -203,6 +210,57 @@ ile az önce eklenen bir ünitenin kelimeleri günün kotası zaten
 doldurulmuşsa hiç görünmezdi — "gruba göre çalış" tam olarak bunu önlemek
 için var. Bu, `planla()`'nın ürettiği aralık/zamanlama mantığına dokunmaz,
 sadece hangi yeni kartların günün kotasından muaf tutulacağına dair.
+
+## Kelime seviyeleri (CEFR)
+
+Kelime kaydındaki isteğe bağlı `seviye` alanı CEFR tahminidir. Geçerli
+değerler `SEVIYELER` sabitinde (`['A1','A2','B1','B2','C1']`, düşükten
+yükseğe) tanımlı. **Her okuma `seviyeNormal()`'den geçer** — baş/son
+boşluğu atıp büyük harfe çevirir, listede yoksa `''` döner. Eski
+kayıtlarda ve elle yazılmış `kelimeler.json` satırlarında alan hiç
+olmayabilir, bu normal; `grup` gibi boşsa JSON'a hiç yazılmaz.
+
+Seviye **bir etiketleme/filtreleme alanıdır, öğrenme motorunu hiç
+etkilemez** — `planla()`'ya, kart üretimine ve kuyruk kurmaya girmez.
+Kelime ekleme/düzenleme formundaki `fSeviye` açılır menüsünden elle
+değiştirilebilir (boş seçenek `—`), `formdanKelimeOku()` boş değeri
+yazmaz. Kelimeler ekranındaki seviye filtresi için bkz. "Kelime grupları
+— Kelime listesi ekranı".
+
+**Fotoğraftan eklerken alt sınır.** Fotoğraf ekranındaki
+`fotoSeviyeSecici` yan yana düğmelerden oluşur: `Tümü` ve `SEVIYELER`'in
+**ilki dışındaki** her seviye için `X+` (A1+ "Tümü" ile aynı anlama
+geldiği için listeye alınmaz). Seçim `AYAR.fotoSeviye`'de saklanır
+(varsayılan `'B1'`, "tümü" için `''`), yani **kalıcıdır** — grup
+sorusunun aksine her fotoğrafta yeniden sorulmaz, ekranda son seçim
+işaretli durur. Ayarlar panelinde değil, fotoğraf ekranında seçilir ama
+`AYAR` içinde yaşar; `baslat()` bozuk/eski bir değeri varsayılana döndürür.
+
+Alt sınır isteme `seviyeElemeMetni()` ile işlenir: alt sınırın
+altındaki seviyeleri "A1, A2 ve B1" biçiminde birleştirir, `Tümü`
+seçiliyken boş döner ve istemde sadece özel isim/sayı elemesi kalır.
+
+**Onay ekranındaki seviye filtresi.** `fotoSeviyeFiltreCiz()` o partide
+geçen her seviye için sayılı bir düğme çizer ("B2 (7)"); seviyesi
+olmayan adaylar `SEVIYESIZ_ETIKET` (`—`) kovasında toplanır. Düğme
+açık/kapalı durumu `fotoSeviyeKapali` Set'inde tutulur.
+
+Düğmeler **sadece DOM'daki işaret kutularını değiştirir, aday listesini
+filtrelemez** — kapatılan seviyenin satırları ekranda kalır, sadece
+işaretleri kalkar. Açılınca varsayılana dönerler: işaretli, ama
+"listede zaten var" olanlar işaretsiz. Bu bilgi çizim anında kutunun
+`data-tekrar` özniteliğine yazılır, `fotoSeviyeIsaretleriUygula()` oradan
+okur. Böylece tek tek işaretleme bundan bağımsız çalışır. Aynı
+fonksiyon `fotoSonucCiz()`'in sonunda da çağrılır — ikinci bir fotoğraf
+eklendiğinde tüm satırlar yeniden çizilip kutular varsayılana döndüğü
+için kapalı seviyeler yeniden uygulanmazsa geri işaretlenmiş olurlardı.
+
+Her aday satırında ayrıca düzenlenebilir bir seviye açılır menüsü var
+(`fo-seviye-<i>`) — model tahmini sınır kelimelerde yanılabiliyor.
+Değiştirilince aday nesnesi güncellenir, seviye kapalı bir kovaya
+taşındıysa o satırın işareti kalkar ve filtre çubuğu sayılarıyla
+birlikte yeniden çizilir. "Seçilenleri ekle" her satırın seviyesini
+`grup` gibi **o satırın kendi alanından** okur.
 
 ## Oyunlar
 
@@ -370,7 +428,14 @@ kelime kaydedilmez.
 - **İstek formatı:** tek mesajda önce `image` bloğu (`source.type`
   `"base64"`, `media_type` `"image/jpeg"`), sonra `text` bloğu. Model
   mevcut kelime listesindeki Almanca temel biçimleri de istem içinde
-  görür ve bunları tekrar çıkarmaması söylenir.
+  görür ve bunları tekrar çıkarmaması söylenir. İstemdeki eleme satırı
+  **sabit değil**, seçilen alt sınırdan üretilir (`seviyeElemeMetni()`) —
+  bkz. "Kelime seviyeleri". Özel isimler ve sayılar her durumda elenir,
+  en fazla 20 kelime sınırı ve "fazlası varsa en yüksek seviyeliler"
+  kuralı alt sınırdan bağımsız geçerlidir.
+- `gorselKelimeCikar(base64Jpeg, altSeviye, ilerlemeFn)` alt sınırı
+  parametre olarak alır, `AYAR`'ı kendisi okumaz — çağıran taraf
+  (`fotoIslemeBasla()`) `AYAR.fotoSeviye`'yi geçirir.
 - **Yanıt** sadece bir JSON dizisi olmalı; ayrıştırma mevcut
   `jsonAyikla` mantığının dizi hali (`diziAyikla`) ile ilk `[` ile son
   `]` arasını alır, ham metni hata mesajına ekler — cümle önerisiyle
@@ -382,9 +447,9 @@ kelime kaydedilmez.
   indirgenerek karşılaştırılır) işaretlenir ve varsayılan olarak
   işaretsiz gelir. "Seçilenleri ekle" işaretli kelimeleri mevcut kelime
   ekleme akışına sokar — GitHub senkronu dahil.
-- Modelin ürettiği `seviye` alanı (CEFR tahmini) sadece onay ekranında
-  gösterilir, A1/A2 kelimelerin ayıklanmasına yardımcı olur; kaydedilen
-  kelime nesnesine dahil edilmez, veri modelinde yeni bir alan değildir.
+- Modelin ürettiği `seviye` alanı (CEFR tahmini) hem onay ekranında
+  düzenlenebilir bir açılır menü olarak gösterilir hem de kaydedilen kelime
+  nesnesine yazılır — bkz. "Kelime seviyeleri".
 - `sw.js`, görsel çıkarma isteklerini de aynı `api.anthropic.com`
   isteği olarak cache'lemeden ağa geçirir — ayrı bir kural gerekmez.
 

@@ -67,6 +67,15 @@ header{
   background:var(--yuzey2);border-radius:10px;
 }
 .foto-grup-sor{display:flex;flex-direction:column;gap:10px}
+.seviye-secici,.seviye-filtre{display:flex;gap:6px;flex-wrap:wrap}
+.seviye-secici button,.seviye-filtre button{
+  flex:1 1 auto;padding:10px 8px;border-radius:10px;
+  background:var(--yuzey);border:1px solid var(--cizgi);
+  font-size:.88rem;font-weight:600;color:var(--sonuk);
+}
+.seviye-secici button.secili{background:var(--metin);color:var(--bg);border-color:var(--metin)}
+.seviye-filtre button.secili{background:var(--yuzey2);color:var(--metin);border-color:var(--metin)}
+.seviye-filtre button:not(.secili){opacity:.5;text-decoration:line-through}
 
 /* ---------- kart alani ---------- */
 main{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;padding:18px 16px}
@@ -303,9 +312,10 @@ button:disabled{opacity:.55;cursor:default}
     <button data-kapat="pListe">Kapat</button>
   </div>
   <div class="panel-icerik">
+    <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
     <div class="satir-flex">
-      <input id="lArama" type="search" autocomplete="off" placeholder="Almanca ya da Türkçe ara...">
-      <select id="lGrupFiltre" style="width:auto;flex:0 0 auto"></select>
+      <select id="lGrupFiltre" style="flex:1 1 0;min-width:0"></select>
+      <select id="lSeviyeFiltre" style="flex:1 1 0;min-width:0"></select>
     </div>
     <div id="lSecimAlan" class="gizli secim-alan">
       <label class="ayar-onay"><input type="checkbox" id="lTumunuSec"> Tümünü seç (görünenler)</label>
@@ -403,6 +413,17 @@ button:disabled{opacity:.55;cursor:default}
     </label>
     <datalist id="grupOneriler"></datalist>
 
+    <label>Seviye <span style="opacity:.7">— isteğe bağlı, CEFR</span>
+      <select id="fSeviye">
+        <option value="">—</option>
+        <option value="A1">A1</option>
+        <option value="A2">A2</option>
+        <option value="B1">B1</option>
+        <option value="B2">B2</option>
+        <option value="C1">C1</option>
+      </select>
+    </label>
+
     <label>Örnek cümle <span style="opacity:.7">— isteğe bağlı</span>
       <textarea id="fCumle" placeholder="Der neue {{Ansatz}} funktioniert gut."></textarea>
     </label>
@@ -431,10 +452,12 @@ button:disabled{opacity:.55;cursor:default}
   <div class="panel-bas"><h2>Fotoğraftan ekle</h2><button data-kapat="pFoto">Kapat</button></div>
   <div class="panel-icerik">
     <p class="yardim">
-      Ders kitabı sayfası ya da not fotoğrafı çek. Sayfadaki B1 ve üzeri
-      Almanca kelimeler otomatik çıkarılır; A1/A2 kelimeler, özel isimler
-      ve sayılar elenir. Listede zaten olan kelimeler ayrıca işaretlenir.
+      Ders kitabı sayfası ya da not fotoğrafı çek. Sayfadaki Almanca kelimeler
+      otomatik çıkarılır; seçtiğin seviyenin altındakiler, özel isimler ve
+      sayılar elenir. Listede zaten olan kelimeler ayrıca işaretlenir.
     </p>
+    <p class="yardim" style="margin-bottom:-6px">Hangi seviyeden itibaren çıkarılsın?</p>
+    <div class="seviye-secici" id="fotoSeviyeSecici"></div>
     <input type="file" id="fotoDosya" accept="image/*" capture="environment" class="gizli">
     <button type="button" class="birincil" id="fotoSec">Fotoğraf seç</button>
     <div id="fotoGrupSor" class="gizli foto-grup-sor">
@@ -445,6 +468,7 @@ button:disabled{opacity:.55;cursor:default}
       <button type="button" class="birincil" id="fotoGrupDevam">Devam</button>
     </div>
     <div id="fotoDurum"></div>
+    <div id="fotoSeviyeFiltre" class="gizli seviye-filtre"></div>
     <div id="fotoSonuc" style="display:flex;flex-direction:column;gap:10px"></div>
     <button type="button" class="birincil gizli" id="fotoEkleBtn">Seçilenleri ekle</button>
   </div>
@@ -565,13 +589,21 @@ const AI_AVCI_MAX_TOKENS = 1200;    // oyun: hatali kelime avi — 6-8 cumlelik 
 const GITHUB_SAHIP = 'mugiatama34';
 const GITHUB_REPO  = 'wortkasten';
 
+// CEFR seviyeleri, dusukten yuksege. Kelime kaydindaki istege bagli "seviye"
+// alani ve fotograftan ekleme akisindaki alt sinir bu listeden gelir.
+const SEVIYELER = ['A1', 'A2', 'B1', 'B2', 'C1'];
+const SEVIYESIZ_ETIKET = '—';  // seviyesi olmayan adaylarin filtre/gruplama anahtari
+
 // sw.js'teki SURUM ile ayni deger olmali — biri degisince ikisi birlikte artirilir.
-const SURUM = 'wortkasten-v22';
+const SURUM = 'wortkasten-v23';
 
 let KELIMELER = [];   // repo + ozel, birlesik
 let OZEL = [];        // sadece bu cihazda eklenenler
 let ILERLEME = {};    // kartId -> durum
-let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0, cumleYazarak: false };
+// fotoSeviye: fotograftan kelime cikarmada alt sinir — '' tum seviyeler,
+// aksi halde SEVIYELER'den bir deger ("B1" => B1 ve uzeri). Ayarlar panelinde
+// degil, fotograf ekraninda secilir ama kalicidir (bkz. CLAUDE.md).
+let AYAR = { yeniLimit: 10, gun: '', yeniSayac: 0, cumleYazarak: false, fotoSeviye: 'B1' };
 let API_ANAHTARI = '';  // Anthropic API anahtari, sadece bu cihazda
 let GH_TOKEN = '';      // GitHub token, sadece bu cihazda
 let BEKLEYEN = [];      // GH_TOKEN varsa: repoya henuz yazilamamis kelimeler
@@ -586,6 +618,7 @@ let duzenlenenId = null;  // kelime ekleme formu duzenleme modundaysa duzenlenen
 let fotoAdaylar = [];  // fotograftan cikarilan, onay bekleyen kelime adaylari
 let fotoSeciliDosya = null;  // grup sorulurken bekleyen fotograf dosyasi
 let fotoPartiGrubu = '';     // o fotograf partisindeki tum kelimelere uygulanacak grup
+let fotoSeviyeKapali = new Set();  // onay ekraninda kapatilmis (isareti kaldirilmis) seviyeler
 
 // calisma kuyrugunu belli bir gruba daraltir. null: tum kelimeler,
 // '': grubu olmayan kelimeler, aksi halde grup adi. Kalici degil,
@@ -1917,6 +1950,7 @@ function formuDoldur(k) {
   document.getElementById('fFormlar').value = k.formlar || '';
   document.getElementById('fTr').value = k.tr || '';
   document.getElementById('fGrup').value = k.grup || '';
+  document.getElementById('fSeviye').value = seviyeNormal(k.seviye);
   document.getElementById('fCumle').value = k.cumle || '';
   document.getElementById('fCumleTr').value = k.cumle_tr || '';
   grupOnerileriDoldur('grupOneriler');
@@ -1925,7 +1959,7 @@ function formuDoldur(k) {
 
 // formu bosaltir, ekleme moduna doner
 function formuTemizle() {
-  ['fDe', 'fTr', 'fGrup', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
+  ['fDe', 'fTr', 'fGrup', 'fSeviye', 'fCogul', 'fFormlar', 'fCumle', 'fCumleTr'].forEach(i => {
     document.getElementById(i).value = '';
   });
   duzenlenenId = null;
@@ -1949,6 +1983,8 @@ function formdanKelimeOku() {
   if (tur === 'fiil') govde.formlar = document.getElementById('fFormlar').value.trim();
   const grup = document.getElementById('fGrup').value.trim();
   if (grup) govde.grup = grup;
+  const seviye = document.getElementById('fSeviye').value;
+  if (seviye) govde.seviye = seviye;
   return govde;
 }
 
@@ -2289,6 +2325,22 @@ function diziKismiKurtar(metin) {
 const FOTO_TURLER = ['isim', 'fiil', 'sifat', 'diger'];
 const FOTO_ARTIKELLER = ['der', 'die', 'das'];
 
+// serbest metni gecerli bir CEFR seviyesine indirger; taninmayan deger -> ''
+function seviyeNormal(ham) {
+  const s = (ham || '').toString().trim().toUpperCase();
+  return SEVIYELER.includes(s) ? s : '';
+}
+
+// alt sinirin altinda kalan seviyeleri isteme yazilacak bicimde doner —
+// "A1 ve A2" gibi. Alt sinir bos ya da en dusuk seviye ise '' doner.
+function seviyeElemeMetni(altSinir) {
+  const i = SEVIYELER.indexOf(altSinir);
+  if (i <= 0) return '';
+  const alttakiler = SEVIYELER.slice(0, i);
+  if (alttakiler.length === 1) return alttakiler[0];
+  return alttakiler.slice(0, -1).join(', ') + ' ve ' + alttakiler[alttakiler.length - 1];
+}
+
 // modelden gelen ham ogeyi guvenli, tum alanlari string olan bir nesneye cevirir
 function fotoOgeTemizle(o) {
   return {
@@ -2298,14 +2350,21 @@ function fotoOgeTemizle(o) {
     cogul: typeof o.cogul === 'string' ? o.cogul.trim() : '',
     formlar: typeof o.formlar === 'string' ? o.formlar.trim() : '',
     tr: o.tr.trim(),
-    seviye: typeof o.seviye === 'string' ? o.seviye.trim() : '',
+    seviye: seviyeNormal(o.seviye),
     cumle: typeof o.cumle === 'string' ? o.cumle.trim() : '',
     cumle_tr: typeof o.cumle_tr === 'string' ? o.cumle_tr.trim() : ''
   };
 }
 
-async function gorselKelimeCikar(base64Jpeg, ilerlemeFn) {
+async function gorselKelimeCikar(base64Jpeg, altSeviye, ilerlemeFn) {
   const mevcutKelimeler = KELIMELER.map(k => k.de).join(', ') || '(liste boş)';
+  // alt sinirin altindaki seviyeler ismen elenir; sinir yoksa sadece ozel
+  // isim/sayi elemesi kalir (bkz. CLAUDE.md "Fotoğraftan kelime çıkarma")
+  const elenen = seviyeElemeMetni(altSeviye);
+  const elemeSatiri = elenen
+    ? `Şunları ELE: ${elenen} seviyesindeki kelimeler, özel isimler, sayılar.
+Sadece ${altSeviye} ve üzeri seviyedeki kelimeleri çıkar.`
+    : 'Şunları ELE: özel isimler, sayılar.';
   const istemMetni = `Bu fotoğraftaki sayfada geçen Almanca kelimeleri çıkar.
 
 Her kelime için şu alanları üret:
@@ -2322,7 +2381,7 @@ Her kelime için şu alanları üret:
   çift süslü parantez içine al, örnek: {{gegangen}}.
 - cumle_tr: cumle alanının Türkçe çevirisi
 
-Şunları ELE: A1 ve A2 seviyesindeki kelimeler, özel isimler, sayılar.
+${elemeSatiri}
 
 En fazla 20 kelime çıkar. Sayfada bundan fazla uygun kelime varsa, seviyesi
 en yüksek olan 20 taneyi seç.
@@ -2404,8 +2463,12 @@ function fotoDurumGoster(mesaj, hataMi) {
 function fotoOgeHtml(a, i, tekrarMi) {
   return `<div class="foto-oge" data-idx="${i}">
     <div class="foto-oge-ust">
-      <input type="checkbox" id="fo-sec-${i}" ${tekrarMi ? '' : 'checked'}>
-      <span>${a.seviye ? kac(a.seviye) : ''}${tekrarMi ? ' · <span class="foto-tekrar">listede zaten var</span>' : ''}</span>
+      <input type="checkbox" id="fo-sec-${i}" data-tekrar="${tekrarMi ? '1' : ''}" ${tekrarMi ? '' : 'checked'}>
+      <select id="fo-seviye-${i}" style="width:auto;flex:0 0 auto;padding:6px 8px;font-size:.85rem">
+        <option value="">—</option>
+        ${SEVIYELER.map(s => `<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <span>${tekrarMi ? '<span class="foto-tekrar">listede zaten var</span>' : ''}</span>
     </div>
     <label>Grup <span style="opacity:.7">— isteğe bağlı</span>
       <input id="fo-grup-${i}" list="grupOnerilerFoto" autocomplete="off" value="${kac(a.grup || '')}" placeholder="Ünite 3">
@@ -2461,6 +2524,67 @@ function fotoOgeBagla(i) {
   turSel.onchange = guncelle;
   guncelle();
   document.getElementById(`fo-artikel-${i}`).value = a.artikel;
+
+  // model tahmini sinir kelimelerde yanilabiliyor — kullanici elle duzeltince
+  // aday nesnesi guncellenir ve filtre cubugundaki sayilar yeniden cizilir
+  const sevSel = document.getElementById(`fo-seviye-${i}`);
+  sevSel.value = a.seviye || '';
+  sevSel.onchange = () => {
+    a.seviye = sevSel.value;
+    if (fotoSeviyeKapali.has(fotoSeviyeAnahtari(a))) {
+      document.getElementById(`fo-sec-${i}`).checked = false;
+    }
+    fotoSeviyeFiltreCiz();
+  };
+}
+
+// bir adayin filtre anahtari — seviyesi yoksa "—" kovasina duser
+function fotoSeviyeAnahtari(a) {
+  return a.seviye || SEVIYESIZ_ETIKET;
+}
+
+// onay ekranindaki seviye filtresi: o partide gecen her seviye icin sayili
+// bir dugme. Dugme "acik"ken (secili) o seviyedeki satirlar isaretli,
+// kapatilinca isaretleri toplu olarak kalkar; tek tek isaretleme bundan
+// bagimsiz calismaya devam eder (dugmeler sadece DOM'daki kutulari degistirir).
+function fotoSeviyeFiltreCiz() {
+  const el = document.getElementById('fotoSeviyeFiltre');
+  if (!fotoAdaylar.length) { el.innerHTML = ''; el.classList.add('gizli'); return; }
+
+  const sayilar = new Map();
+  for (const a of fotoAdaylar) {
+    const s = fotoSeviyeAnahtari(a);
+    sayilar.set(s, (sayilar.get(s) || 0) + 1);
+  }
+  const sira = s => { const i = SEVIYELER.indexOf(s); return i === -1 ? 99 : i; };
+  const seviyeler = [...sayilar.keys()].sort((a, b) => sira(a) - sira(b));
+
+  el.classList.remove('gizli');
+  el.innerHTML = seviyeler.map(s =>
+    `<button type="button" class="${fotoSeviyeKapali.has(s) ? '' : 'secili'}" data-sev="${kac(s)}">${kac(s)} (${sayilar.get(s)})</button>`
+  ).join('');
+  el.querySelectorAll('[data-sev]').forEach(b => {
+    b.onclick = () => fotoSeviyeAcKapa(b.dataset.sev);
+  });
+}
+
+function fotoSeviyeAcKapa(seviye) {
+  const kapat = !fotoSeviyeKapali.has(seviye);
+  if (kapat) fotoSeviyeKapali.add(seviye);
+  else fotoSeviyeKapali.delete(seviye);
+  fotoSeviyeIsaretleriUygula();
+  fotoSeviyeFiltreCiz();
+}
+
+// kapali seviyelerdeki satirlarin isaretini kaldirir, acik seviyelerdekini
+// varsayilana (listede zaten olanlar disinda isaretli) dondurur
+function fotoSeviyeIsaretleriUygula() {
+  fotoAdaylar.forEach((a, i) => {
+    const s = fotoSeviyeAnahtari(a);
+    const cb = document.getElementById(`fo-sec-${i}`);
+    if (!cb) return;
+    cb.checked = fotoSeviyeKapali.has(s) ? false : !cb.dataset.tekrar;
+  });
 }
 
 function fotoSonucCiz() {
@@ -2471,15 +2595,40 @@ function fotoSonucCiz() {
     fotoOgeHtml(a, i, mevcutAnahtarlar.has(kelimeAnahtari(a.de)))
   ).join('');
   fotoAdaylar.forEach((a, i) => fotoOgeBagla(i));
+  // satirlar yeniden cizildi, kutular varsayilana dondu — kapali seviyeler
+  // yeniden uygulanmazsa ikinci fotograftan sonra geri isaretlenmis olurlardi
+  fotoSeviyeIsaretleriUygula();
+  fotoSeviyeFiltreCiz();
   document.getElementById('fotoEkleBtn').classList.toggle('gizli', !fotoAdaylar.length);
+}
+
+// fotograf ekranindaki alt sinir secicisi — "Tumu" ve her seviye icin "X+".
+// Secim AYAR.fotoSeviye'de saklanir, her fotografta yeniden sorulmaz.
+function fotoSeviyeSeciciCiz() {
+  const el = document.getElementById('fotoSeviyeSecici');
+  // en dusuk seviye ("A1+") "Tumu" ile ayni anlama gelirdi, listeye alinmaz
+  const secenekler = [{ deger: '', ad: 'Tümü' }]
+    .concat(SEVIYELER.slice(1).map(s => ({ deger: s, ad: s + '+' })));
+  el.innerHTML = secenekler.map(o =>
+    `<button type="button" class="${AYAR.fotoSeviye === o.deger ? 'secili' : ''}" data-alt="${kac(o.deger)}">${kac(o.ad)}</button>`
+  ).join('');
+  el.querySelectorAll('[data-alt]').forEach(b => {
+    b.onclick = () => {
+      AYAR.fotoSeviye = b.dataset.alt;
+      yaz(K_AYAR, AYAR);
+      fotoSeviyeSeciciCiz();
+    };
+  });
 }
 
 function fotoPaneliSifirla() {
   fotoAdaylar = [];
   fotoSeciliDosya = null;
   fotoPartiGrubu = '';
+  fotoSeviyeKapali.clear();
   fotoDurumGoster('');
   fotoSonucCiz();
+  fotoSeviyeSeciciCiz();
   document.getElementById('fotoSec').disabled = false;
   document.getElementById('fotoSec').classList.remove('gizli');
   document.getElementById('fotoGrupSor').classList.add('gizli');
@@ -2524,7 +2673,7 @@ async function fotoIslemeBasla() {
     fotoDurumGoster('Küçültülüyor...');
     const b64 = await gorselKucult(dosya);
 
-    const sonuc = await gorselKelimeCikar(b64, fotoDurumGoster);
+    const sonuc = await gorselKelimeCikar(b64, AYAR.fotoSeviye || '', fotoDurumGoster);
 
     // her aday, cikarildigi andaki fotoPartiGrubu ile etiketlenir ve mevcut
     // fotoAdaylar dizisine EKLENIR (ustune yazilmaz) — boylece ayni onay
@@ -2580,6 +2729,8 @@ document.getElementById('fotoEkleBtn').onclick = () => {
     // dalindan geldigine bakilmaksizin onay ekranindaki deger esas alinir
     const grup = document.getElementById(`fo-grup-${i}`).value.trim();
     if (grup) govde.grup = grup;
+    const seviye = document.getElementById(`fo-seviye-${i}`).value;
+    if (seviye) govde.seviye = seviye;
     govdeler.push(govde);
   });
 
@@ -2771,6 +2922,28 @@ function lGrupFiltreDoldur() {
   if ([...sel.options].some(o => o.value === secili)) sel.value = secili;
 }
 
+// seviye filtresi acilir menusunu (Tum seviyeler / her seviye / Seviyesiz)
+// sayilarla doldurur; grup filtresiyle birlikte, ondan bagimsiz calisir
+function lSeviyeFiltreDoldur() {
+  const sel = document.getElementById('lSeviyeFiltre');
+  const secili = sel.value;
+  const sayilar = new Map();
+  let seviyesiz = 0;
+  for (const k of KELIMELER) {
+    const sv = seviyeNormal(k.seviye);
+    if (!sv) { seviyesiz++; continue; }
+    sayilar.set(sv, (sayilar.get(sv) || 0) + 1);
+  }
+
+  let h = `<option value="">Tüm seviyeler (${KELIMELER.length})</option>`;
+  for (const sv of SEVIYELER) {
+    if (sayilar.has(sv)) h += `<option value="${sv}">${sv} (${sayilar.get(sv)})</option>`;
+  }
+  h += `<option value="__seviyesiz__">Seviyesiz (${seviyesiz})</option>`;
+  sel.innerHTML = h;
+  if ([...sel.options].some(o => o.value === secili)) sel.value = secili;
+}
+
 // coklu secim modu: liste ekraninda birden fazla kelime secip toplu islem
 // yapmaya yarar (bkz. CLAUDE.md "Kelime gruplari" — toplu grup atama).
 // Kalici degil, panel her kapandiginda sifirlanir.
@@ -2790,8 +2963,10 @@ function listeSecimBilgiGuncelle() {
 
 function listeCiz() {
   lGrupFiltreDoldur();
+  lSeviyeFiltreDoldur();
   const q = document.getElementById('lArama').value.trim().toLocaleLowerCase('tr-TR');
   const grupSecim = document.getElementById('lGrupFiltre').value;
+  const seviyeSecim = document.getElementById('lSeviyeFiltre').value;
   const harita = kelimeKartHaritasi();
   const el = document.getElementById('listeSonuc');
 
@@ -2802,6 +2977,9 @@ function listeCiz() {
     : siralanan;
   if (grupSecim === '__grupsuz__') gosterilecek = gosterilecek.filter(k => !(k.grup || '').trim());
   else if (grupSecim) gosterilecek = gosterilecek.filter(k => (k.grup || '').trim() === grupSecim);
+  // seviye filtresi grup filtresinden bagimsiz, ikisi birlikte daraltir
+  if (seviyeSecim === '__seviyesiz__') gosterilecek = gosterilecek.filter(k => !seviyeNormal(k.seviye));
+  else if (seviyeSecim) gosterilecek = gosterilecek.filter(k => seviyeNormal(k.seviye) === seviyeSecim);
 
   listeSonGosterilenIdler = gosterilecek.map(k => k.id);
 
@@ -2817,11 +2995,12 @@ function listeCiz() {
       const kartIdleri = harita.get(k.id) || [];
       const durum = kelimeDurumu(kartIdleri);
       const grupMetni = k.grup ? ' · ' + kac(k.grup) : '';
+      const seviyeMetni = seviyeNormal(k.seviye) ? ' · ' + seviyeNormal(k.seviye) : '';
       return `<label class="liste-satir" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
         <input type="checkbox" data-sec-id="${kac(k.id)}" style="width:auto;margin-top:3px" ${listeSecili.has(k.id) ? 'checked' : ''}>
         <span style="flex:1">
           <div class="liste-bas">${kac(bas)}</div>
-          <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}</div>
+          <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}${seviyeMetni}</div>
         </span>
       </label>`;
     }).join('');
@@ -2842,9 +3021,10 @@ function listeCiz() {
     const kartIdleri = harita.get(k.id) || [];
     const durum = kelimeDurumu(kartIdleri);
     const grupMetni = k.grup ? ' · ' + kac(k.grup) : '';
+    const seviyeMetni = seviyeNormal(k.seviye) ? ' · ' + seviyeNormal(k.seviye) : '';
     return `<button class="liste-satir" data-id="${kac(k.id)}">
       <div class="liste-bas">${kac(bas)}</div>
-      <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}</div>
+      <div class="liste-alt">${kac(k.tr)} · ${kartIdleri.length} kart · ${DURUM_ETIKET[durum]}${grupMetni}${seviyeMetni}</div>
     </button>`;
   }).join('');
 
@@ -2859,6 +3039,7 @@ function listeCiz() {
 }
 document.getElementById('lArama').oninput = listeCiz;
 document.getElementById('lGrupFiltre').onchange = listeCiz;
+document.getElementById('lSeviyeFiltre').onchange = listeCiz;
 
 function listeSecimModunuKapat() {
   listeSecimModu = false;
@@ -3180,6 +3361,8 @@ async function baslat() {
   ILERLEME = oku(K_ILERLEME, {});
   OZEL = oku(K_OZEL, []);
   AYAR = Object.assign(AYAR, oku(K_AYAR, {}));
+  // bozuk/eski bir kayittan gelen gecersiz alt sinir varsayilana doner
+  if (AYAR.fotoSeviye !== '' && !SEVIYELER.includes(AYAR.fotoSeviye)) AYAR.fotoSeviye = 'B1';
   API_ANAHTARI = oku(K_APIANAHTAR, '') || '';
   aiDurumGuncelle();
   GH_TOKEN = oku(K_GHTOKEN, '') || '';
