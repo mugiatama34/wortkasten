@@ -680,6 +680,15 @@
       "cumle": "Ich {{rechne}} mit deiner Hilfe für das Projekt.",
       "cumle_tr": "Proje için senin yardımını bekliyorum.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umulb8c090",
+      "tur": "diger",
+      "de": "in Gang kommen",
+      "tr": "Islemwye baslamak",
+      "cumle": "Das Projekt ist endlich {{in Gang gekommen}} und wir arbeiten hart daran.",
+      "cumle_tr": "Proje sonunda işlemeye başladı ve biz üzerinde sıkı çalışıyoruz.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
