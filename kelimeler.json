@@ -662,6 +662,15 @@
       "cumle": "Er soll die Kameras {{installieren}}.",
       "cumle_tr": "Kameraları kurması gerekiyor.",
       "formlar": "installiert, installierte, hat installiert"
+    },
+    {
+      "id": "umulb2lfb0",
+      "tur": "diger",
+      "de": "in Verbindung setzen",
+      "tr": "Iletisime gecmek",
+      "cumle": "Ich muss mich mit meinem Chef {{in Verbindung setzen}}.",
+      "cumle_tr": "Şefimle iletişime geçmem gerekiyor.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
