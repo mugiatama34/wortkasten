@@ -671,6 +671,15 @@
       "cumle": "Ich muss mich mit meinem Chef {{in Verbindung setzen}}.",
       "cumle_tr": "Şefimle iletişime geçmem gerekiyor.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umulb6h6u0",
+      "tur": "diger",
+      "de": "mit etwas rechnen",
+      "tr": "Beklemek, hesaba katmak",
+      "cumle": "Ich {{rechne}} mit deiner Hilfe für das Projekt.",
+      "cumle_tr": "Proje için senin yardımını bekliyorum.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
