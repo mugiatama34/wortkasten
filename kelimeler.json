@@ -698,6 +698,15 @@
       "cumle": "Ich möchte {{eine Beschwerde einreichen}} gegen diesen defekten Kühlschrank.",
       "cumle_tr": "Bu bozuk buzdolabı hakkında sikayette bulunmak istiyorum.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umulbq4o40",
+      "tur": "diger",
+      "de": "entscheidung treffen",
+      "tr": "Karar vermek",
+      "cumle": "Ich muss eine wichtige {{Entscheidung treffen}} für mein Projekt.",
+      "cumle_tr": "Projelerim için önemli bir karar vermek zorundayım.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
