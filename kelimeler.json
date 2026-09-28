@@ -707,6 +707,14 @@
       "cumle": "Ich muss eine wichtige {{Entscheidung treffen}} für mein Projekt.",
       "cumle_tr": "Projelerim için önemli bir karar vermek zorundayım.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umulbs5890",
+      "tur": "diger",
+      "de": "Maßnahmen ergreifen",
+      "tr": "Önlem almak",
+      "cumle": "Die Regierung muss schnell {{Maßnahmen ergreifen}} gegen die Inflation.",
+      "cumle_tr": "Hükümet enflasyona karşı hızlı önlem almalıdır."
     }
   ]
 }
