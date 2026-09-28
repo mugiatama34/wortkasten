@@ -689,6 +689,15 @@
       "cumle": "Das Projekt ist endlich {{in Gang gekommen}} und wir arbeiten hart daran.",
       "cumle_tr": "Proje sonunda işlemeye başladı ve biz üzerinde sıkı çalışıyoruz.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umulbn80x0",
+      "tur": "diger",
+      "de": "eine Beschwerde einreichen",
+      "tr": "Sikayette bulunmak",
+      "cumle": "Ich möchte {{eine Beschwerde einreichen}} gegen diesen defekten Kühlschrank.",
+      "cumle_tr": "Bu bozuk buzdolabı hakkında sikayette bulunmak istiyorum.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
