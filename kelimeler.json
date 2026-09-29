@@ -715,6 +715,15 @@
       "tr": "Önlem almak",
       "cumle": "Die Regierung muss schnell {{Maßnahmen ergreifen}} gegen die Inflation.",
       "cumle_tr": "Hükümet enflasyona karşı hızlı önlem almalıdır."
+    },
+    {
+      "id": "umumhzbwo0",
+      "tur": "fiil",
+      "de": "Entlassen",
+      "tr": "Görevden alinma",
+      "cumle": "Ayse wurde entlassen und will sich dagegen wehren",
+      "cumle_tr": "Meslektaşım geçen hafta görevden alındı ve şimdi yeni bir iş arıyor.",
+      "formlar": ""
     }
   ]
 }
