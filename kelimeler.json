@@ -734,6 +734,16 @@
       "cumle_tr": "",
       "formlar": "",
       "grup": "Lesen- Fiiller"
+    },
+    {
+      "id": "umumi38zl0",
+      "tur": "fiil",
+      "de": "entlassen",
+      "tr": "görevden alinma",
+      "cumle": "Ayse wurde entlassen und will sich dagegen wehren.",
+      "cumle_tr": "",
+      "formlar": "",
+      "grup": "Lesen- Fiiller"
     }
   ]
 }
