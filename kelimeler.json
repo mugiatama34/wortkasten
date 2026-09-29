@@ -724,6 +724,16 @@
       "cumle": "Ayse wurde entlassen und will sich dagegen wehren",
       "cumle_tr": "Meslektaşım geçen hafta görevden alındı ve şimdi yeni bir iş arıyor.",
       "formlar": ""
+    },
+    {
+      "id": "umumi1iz60",
+      "tur": "fiil",
+      "de": "Überlegen",
+      "tr": "Düsünme, tasinma",
+      "cumle": "Fatma überlegt, eine Ausbildung im Fremdsprachenbereich zu machen.",
+      "cumle_tr": "",
+      "formlar": "",
+      "grup": "Lesen- Fiiller"
     }
   ]
 }
