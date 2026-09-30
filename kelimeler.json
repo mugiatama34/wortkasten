@@ -777,6 +777,15 @@
       "cumle": "Ich möchte {{einen Vorschlag machen}} für unser Projekt.",
       "cumle_tr": "Projemiz için bir öneride bulunmak istiyorum.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umunwqqh40",
+      "tur": "diger",
+      "de": "eine Frist einhalten",
+      "tr": "Süreye uymak",
+      "cumle": "Du musst die {{Frist einhalten}}, sonst gibt es Probleme.",
+      "cumle_tr": "Süreye uymanız gerekir, aksi takdirde sorun olur.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
