@@ -768,6 +768,15 @@
       "tr": "Aciklamak, duyurmak",
       "cumle": "",
       "cumle_tr": ""
+    },
+    {
+      "id": "umunwpq1x0",
+      "tur": "diger",
+      "de": "einen Vorschlag machen",
+      "tr": "Öneride bulunmak",
+      "cumle": "Ich möchte {{einen Vorschlag machen}} für unser Projekt.",
+      "cumle_tr": "Projemiz için bir öneride bulunmak istiyorum.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
