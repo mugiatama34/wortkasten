@@ -752,6 +752,14 @@
       "tr": "Istedigi kadar calisma",
       "cumle": "",
       "cumle_tr": ""
+    },
+    {
+      "id": "umunq8lv40",
+      "tur": "diger",
+      "de": "Entsprechenden Guthaben (Stunden guthaben Cevapta)",
+      "tr": "Yeterli bakiye",
+      "cumle": "",
+      "cumle_tr": ""
     }
   ]
 }
