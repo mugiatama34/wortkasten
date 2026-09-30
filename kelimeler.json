@@ -760,6 +760,14 @@
       "tr": "Yeterli bakiye",
       "cumle": "",
       "cumle_tr": ""
+    },
+    {
+      "id": "umunsx6vm0",
+      "tur": "diger",
+      "de": "Bekant geben",
+      "tr": "Aciklamak, duyurmak",
+      "cumle": "",
+      "cumle_tr": ""
     }
   ]
 }
