@@ -786,6 +786,15 @@
       "cumle": "Du musst die {{Frist einhalten}}, sonst gibt es Probleme.",
       "cumle_tr": "Süreye uymanız gerekir, aksi takdirde sorun olur.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umup59nrm0",
+      "tur": "diger",
+      "de": "Rücksicht Nehmen Auf",
+      "tr": "Saygi göstermek",
+      "cumle": "Du musst {{Rücksicht auf}} deine Eltern nehmen.",
+      "cumle_tr": "Ebeveynlerine saygı göstermelisin.",
+      "grup": "Nomen-Verb verb."
     }
   ]
 }
