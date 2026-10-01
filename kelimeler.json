@@ -795,6 +795,14 @@
       "cumle": "Du musst {{Rücksicht auf}} deine Eltern nehmen.",
       "cumle_tr": "Ebeveynlerine saygı göstermelisin.",
       "grup": "Nomen-Verb verb."
+    },
+    {
+      "id": "umup5atcy0",
+      "tur": "diger",
+      "de": "einen Auftrag erteilen",
+      "tr": "Siparis vermek",
+      "cumle": "Der Chef hat mir einen wichtigen {{Auftrag erteilt}} für das Projekt.",
+      "cumle_tr": "Şef bana proje için önemli bir sipariş verdi."
     }
   ]
 }
